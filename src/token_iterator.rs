@@ -25,6 +25,7 @@ struct TokenIterator<'a>  {
 	integer: Regex,
 	comment: Regex,
 	whitespace: Regex,
+	string_literal: Regex,
 	identifier: Regex,
 	var_decl: Regex,
 	text: &'a str,
@@ -40,18 +41,19 @@ impl<'a>  TokenIterator<'a>  {
 		let keyword = Regex::new(r"(\bvar\b)|(\bfor\b)|(\bend\b)|(\bin\b)|(\bdo\b)|(\bread\b)|(\bprint\b)|(\bint\b)|(\bstring\b)|(\bbool\b)|(\bassert\b)").unwrap();
 		let integer = Regex::new(r"\b\d+\b").unwrap();
 		let comment = Regex::new(r"(/\*.*\*/)|(//\p{White_Space}*)").unwrap();
-		let string_literal = Regex::new(r"\"\"");
+		let string_literal = Regex::new(r#"^"([^"\\]|\\.)*"$"#).unwrap();
 		let whitespace = Regex::new(r"\p{White_Space}*").unwrap();
 		let identifier = Regex::new(r"^[A-Za-z][A-Za-z0-9]*|(\b[A-Za-z]+[0-9]*)").unwrap();
 		let var_decl = Regex::new(r"var .*:.*(int|string|bool)").unwrap();
 		//let allRegex: Vec<Regex> = vec!(single_char_token.clone(), two_char_token.clone(), keyword.clone(), integer.clone(), real_number.clone(), comment.clone(), identifier.clone());
-		let allRegex: Vec<Regex> = vec!(keyword.clone(), identifier.clone(), two_char_token.clone(), single_char_token.clone(), integer.clone());
+		let allRegex: Vec<Regex> = vec!(string_literal.clone(),keyword.clone(), identifier.clone(), two_char_token.clone(), single_char_token.clone(), integer.clone());
         TokenIterator {
             single_char_token: single_char_token,
 			two_char_token:	two_char_token,	
 			keyword: keyword,
 			integer: integer,
 			comment: comment,
+			string_literal: string_literal,
 			whitespace: whitespace,
 			identifier: identifier,
 			text: string,
@@ -84,17 +86,17 @@ impl<'a> Iterator for TokenIterator<'a> {
 			unsafe {
 				slice = self.text.slice_unchecked(0, ind+1); //ind plus one so the slice encompasses the chars between 0 and this potition
 			}
+			println!("index:{}, slice:{}", ind, slice);
+			
 			let peek_tuple: Option<&(usize, char)> = char_indices.peek();
-			let mut found = false;	
 			for rex in &self.allRegex {
 				if let Some((start, end)) = rex.find(slice) {
 					if(start == 0) {
 						last_valid_index = cmp::max(last_valid_index, end);
-						found = true;
 					}
 				}
 			}
-			if !found {break;} //if exhausted all options, break here
+			//not breaking here causes the iterator to iterate all chars... TODO
 		}
 		
 		let (first, second) = self.text.split_at(last_valid_index);
@@ -159,10 +161,18 @@ fn tokenize_for_loop() -> () {
 
 #[test]
 fn tokenize_string_literal() -> () {
-	let code = "\"Give a number\";";
+	let code = r#""Give a number";"#;
 	let mut iterator = TokenIterator::new(code);
-	assert_eq!("\"Give a number\"",iterator.next().unwrap());
+	assert_eq!(r#""Give a number""#,iterator.next().unwrap());
 	assert_eq!(";",iterator.next().unwrap());
+}
+
+#[test]
+fn test_regex_string_literal() -> () {
+	let mut parser = TokenIterator::new("\"test string\"");
+	let string_literal: Regex = parser.string_literal;
+	
+	assert!(string_literal.is_match(&r#""test string""#));
 }
 
 /*
@@ -233,18 +243,6 @@ fn test_regex_comments() -> () {
 }
 
 #[test]
-fn test_regex_real_number() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let real_number: Regex = parser.real_number;
-	assert!(real_number.is_match(&"1.02"));
-	assert!(!real_number.is_match(&"102"));
-	assert!(!real_number.is_match(&".102"));
-	assert!(!real_number.is_match(&"."));
-	assert!(!real_number.is_match(&"asd1.0"));
-	assert!(!real_number.is_match(&"1.0asd"));
-}
-
-#[test]
 fn test_regex_integer() -> () {
 	let mut parser = TokenIterator::new("test string");
 	let integer: Regex = parser.integer;
@@ -287,28 +285,5 @@ fn test_regex_single_token() -> () {
 	assert!(single_char_token.is_match(&")"));
 	assert!(single_char_token.is_match(&"+"));
 	assert!(single_char_token.is_match(&"."));
-}
-
-#[test]
-fn tokenize_var_declaration() -> () {
-	let code = "    var X : int := 4 + (6 * 2);";
-	let mut iterator = TokenIterator::new(code);
-	assert_eq!("var", iterator.next().unwrap());
-	assert_eq!("X", iterator.next().unwrap());
-	assert_eq!(":", iterator.next().unwrap());
-	assert_eq!("int", iterator.next().unwrap());
-	assert_eq!(";", iterator.next().unwrap());
-
-	//let v = vec!("var", "X", ":", "int", ";");
-	//assert_eq!(v, tokens);
-}
-
-#[test]
-fn tokenize_string_expression() -> () {
-	let code = "print \"Give a number\";";
-	let mut iterator = TokenIterator::new(code);
-	assert_eq!("print", iterator.next().unwrap());
-	assert_eq!("\"Give a number\"", iterator.next().unwrap());
-	assert_eq!(";", iterator.next().unwrap());
 }
 */
