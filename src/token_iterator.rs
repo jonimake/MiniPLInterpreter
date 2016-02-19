@@ -3,22 +3,7 @@ use regex::Regex;
 use std::str::FromStr;
 use std::cmp;
 
-#[derive(PartialEq, Debug)]
-enum PLVar<'a> {
-	PLString(&'a str),
-	PLBool(bool),
-	PLInt(i32)
-}
-
-#[derive(PartialEq,Debug)]
-enum Token<'a>  {
-	Var_decl(&'a str, PLVar<'a>),
-	String_literal(&'a str),
-	Keyword(&'a str),
-}
-
-
-struct TokenIterator<'a>  {
+pub struct TokenIterator<'a>  {
 	single_char_token: Regex,
 	two_char_token:	Regex,	
 	keyword: Regex,
@@ -41,7 +26,7 @@ impl<'a>  TokenIterator<'a>  {
 		let keyword = Regex::new(r"(\bvar\b)|(\bfor\b)|(\bend\b)|(\bin\b)|(\bdo\b)|(\bread\b)|(\bprint\b)|(\bint\b)|(\bstring\b)|(\bbool\b)|(\bassert\b)").unwrap();
 		let integer = Regex::new(r"\b\d+\b").unwrap();
 		let comment = Regex::new(r"(/\*.*\*/)|(//\p{White_Space}*)").unwrap();
-		let string_literal = Regex::new(r#"^"([^"\\]|\\.)*"$"#).unwrap();
+		let string_literal = Regex::new(r#"^"([^"\\]|\\.)*"?$"#).unwrap();
 		let whitespace = Regex::new(r"\p{White_Space}*").unwrap();
 		let identifier = Regex::new(r"^[A-Za-z][A-Za-z0-9]*|(\b[A-Za-z]+[0-9]*)").unwrap();
 		let var_decl = Regex::new(r"var .*:.*(int|string|bool)").unwrap();
@@ -75,33 +60,52 @@ impl<'a> Iterator for TokenIterator<'a> {
 		}
 
 		let mut char_indices = self.text.char_indices().peekable();
-
 		let mut end_index: usize = 0;
 		let mut token: Option<&'a str> = None;
 		let mut last_valid_index = 0;
 		let mut slice = ""; 
+		let mut last_was_escape = false;
 		//need to find longest match
+		let mut is_string = false;
 		while let Some(tuple) = char_indices.next() {	
 			let (ind, ch) = tuple;			
 			unsafe {
 				slice = self.text.slice_unchecked(0, ind+1); //ind plus one so the slice encompasses the chars between 0 and this potition
 			}
-			println!("index:{}, slice:{}", ind, slice);
-			
+			//special case handling for strings
+			if(ind == 0 && ch == '"' || is_string) {
+				is_string = true;
+				last_valid_index = ind+1;
+				if(ch == '\\') {
+					last_was_escape = true;
+					continue;
+				}
+				if(ind > 0 && ch == '"' && !last_was_escape) {
+					break;
+				}
+				last_was_escape = false;
+				continue;
+			}
+
+
+			//println!("index:{}, slice:{}", ind, slice);
+			let mut found = false;
 			let peek_tuple: Option<&(usize, char)> = char_indices.peek();
 			for rex in &self.allRegex {
 				if let Some((start, end)) = rex.find(slice) {
 					if(start == 0) {
 						last_valid_index = cmp::max(last_valid_index, end);
+						found = true;
 					}
 				}
 			}
-			//not breaking here causes the iterator to iterate all chars... TODO
+			if !found {break}
 		}
-		
 		let (first, second) = self.text.split_at(last_valid_index);
-		println!("'{}'<=>'{}'", first, second);
 		self.text = second;
+		if(first.len() == 0) {
+			return None;
+		}
 		Some(first)
     }
 }
@@ -171,22 +175,8 @@ fn tokenize_string_literal() -> () {
 fn test_regex_string_literal() -> () {
 	let mut parser = TokenIterator::new("\"test string\"");
 	let string_literal: Regex = parser.string_literal;
-	
 	assert!(string_literal.is_match(&r#""test string""#));
 }
-
-/*
-#[test]
-fn read_string_token() -> () {
-	let code = "\"Give a number\";";
-	let mut iterator = TokenIterator::new(code);
-	let token = iterator.next().unwrap();
-	assert_eq!(Token::String_literal("\"Give a number\""), token);
-}*/
-/*
-
-
-
 #[test]
 fn tokenize_keyword() -> () {
 	let code = "print for var ";
@@ -194,96 +184,4 @@ fn tokenize_keyword() -> () {
 	assert_eq!("print", iterator.next().unwrap());
 	assert_eq!("for", iterator.next().unwrap());
 	assert_eq!("var", iterator.next().unwrap());
-}*/
-/*
-#[test]
-fn tokenize_int_var_declaration() -> () {
-	let code = "var x : int;";
-	let mut iterator = TokenIterator::new(code);
-	let token = iterator.next().unwrap();
-	assert_eq!(Token::Var_decl("x", PLVar::PLInt(0)), token);
-	
 }
-
-#[test]
-fn tokenize_string_var_definition() -> () {
-	let code = "var x : string := \"this is a string\";";
-	let mut iterator = TokenIterator::new(code);
-	let token = iterator.next().unwrap();
-	assert_eq!(Token::Var_decl("x", PLVar::PLString("\"this is a string\"")), token);
-}
-*/
-/*
-#[test]
-fn test_regex_whitespace() -> () {	
-	let mut parser = TokenIterator::new("test string");
-	let whitespace = parser.whitespace;
-	assert!(whitespace.is_match(&" "), "failure");
-	assert!(whitespace.is_match(&"   "), "failure");
-	assert!(whitespace.is_match(&"			"), "failure");
-	assert!(whitespace.is_match(&"			"), "failure");
-
-}
-
-#[test]
-fn test_regex_keyword() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let keyword: Regex = parser.keyword;
-	assert!(keyword.is_match(&"var"));
-	assert!(keyword.is_match(&" var "));
-	assert!(keyword.is_match(&"for"));
-}
-
-#[test]
-fn test_regex_comments() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let comment: Regex = parser.comment;
-	assert!(comment.is_match(&"/*this is a comment*/"));
-	assert!(comment.is_match(&"//this is another comment"));
-}
-
-#[test]
-fn test_regex_integer() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let integer: Regex = parser.integer;
-	
-	assert!(integer.is_match(&"1"));
-	assert!(integer.is_match(&"-1"));
-	assert!(!integer.is_match(&" "));
-	assert!(integer.is_match(&"123"));
-	assert!(!integer.is_match(&"123aasd"));
-	assert!(!integer.is_match(&"asd123"));
-}
-
-#[test]
-fn test_regex_two_char_token() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let two_char_token: Regex =	parser.two_char_token;
-	assert!(two_char_token.is_match(&".."));
-	assert!(two_char_token.is_match(&":="));
-	assert!(two_char_token.is_match(&":==")); //throw an error after checking tokens
-	assert!(two_char_token.is_match(&"..."));
-	assert!(!two_char_token.is_match(&"."));
-}
-
-#[test]
-fn test_regex_identitier() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let identifier: Regex =	parser.identifier;
-	assert!(identifier.is_match(&"foo"));
-	assert!(identifier.is_match(&"foo123"));
-	assert!(!identifier.is_match(&"123foo"));
-}
-
-#[test]
-fn test_regex_single_token() -> () {
-	let mut parser = TokenIterator::new("test string");
-	let single_char_token: Regex = parser.single_char_token;
-	assert!(single_char_token.is_match(&"/"));
-	assert!(single_char_token.is_match(&"-"));
-	assert!(single_char_token.is_match(&"("));
-	assert!(single_char_token.is_match(&")"));
-	assert!(single_char_token.is_match(&"+"));
-	assert!(single_char_token.is_match(&"."));
-}
-*/
