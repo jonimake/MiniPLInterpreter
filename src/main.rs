@@ -8,6 +8,7 @@ extern crate regex;
 
 pub mod token_iterator;
 pub mod definitions;
+pub mod parser;
 
 use std::error::Error;
 use std::fs::File;
@@ -18,6 +19,7 @@ use std::str::SplitWhitespace;
 use std::iter::Peekable;
 
 fn main() {
+
 	let path = Path::new("sample1.txt");
 	assert!(path.exists());
 

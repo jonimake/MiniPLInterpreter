@@ -89,14 +89,15 @@ impl<'a> Iterator for TokenIterator<'a> {
 			println!("index:{}, slice:{}", ind, slice);
 			
 			let peek_tuple: Option<&(usize, char)> = char_indices.peek();
+			let mut found = false;
 			for rex in &self.allRegex {
 				if let Some((start, end)) = rex.find(slice) {
 					if(start == 0) {
 						last_valid_index = cmp::max(last_valid_index, end);
+						found = true;
 					}
 				}
 			}
-			//not breaking here causes the iterator to iterate all chars... TODO
 		}
 		
 		let (first, second) = self.text.split_at(last_valid_index);
@@ -134,9 +135,6 @@ fn tokenize_bool_var_definition() -> () {
 }
 #[test]
 fn tokenize_for_loop() -> () {
-	let r = regex::quote("\"(\\\"|[^\"])*\"");
-	println!("{:?}", r);
-	//assert_eq!(true, false);
 	let code =		"for x in 0..nTimes-1 do \
 						print x; \
 					end for;";
@@ -173,6 +171,22 @@ fn test_regex_string_literal() -> () {
 	let string_literal: Regex = parser.string_literal;
 	
 	assert!(string_literal.is_match(&r#""test string""#));
+}
+
+#[test]
+fn test_regex_empty_string_literal() -> () {
+	let mut parser = TokenIterator::new("\"\"");
+	let string_literal: Regex = parser.string_literal;
+
+	assert!(string_literal.is_match(&r#""test string""#));
+}
+
+#[test]
+fn test_regex_invalid_string_literal() -> () {
+	let mut parser = TokenIterator::new("test string\"");
+	let string_literal: Regex = parser.string_literal;
+
+	assert!(!string_literal.is_match(&r#"test string""#));
 }
 
 /*
