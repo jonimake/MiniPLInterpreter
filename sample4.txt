@@ -1,0 +1,3 @@
+var X : int;
+X := 15;
+print X;

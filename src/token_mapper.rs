@@ -32,7 +32,7 @@ pub struct TokenMapper<'a>  {
 }
 
 impl<'a>  TokenMapper<'a>  {
-	pub fn new(it: &'a TokenIterator) -> TokenMapper<'a> {
+	pub fn new(it: &'a TokenIterator<'a>) -> TokenMapper<'a> {
 		TokenMapper{tokenIterator: it}
 	}
 }

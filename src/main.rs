@@ -11,6 +11,7 @@ pub mod definitions;
 pub mod token_mapper;
 
 use token_iterator::TokenIterator;
+use token_iterator::Token;
 
 use std::error::Error;
 use std::fs::File;
@@ -75,9 +76,9 @@ fn main() {
 }
 
 fn eval_line(line: &str) {
-	let mut variables = HashMap::new();
-	let mut it = TokenIterator::new(line);
-	let all_tokens: Vec<&str> = it.collect();
+	//let mut variables = HashMap::new();
+	//let mut it = TokenIterator::new(line);
+	/*let all_tokens: Vec<&Token> = it.collect();
 	let mut token_it = all_tokens.into_iter().peekable();
 	while let Some(token) = token_it.next() {
 		match token {
@@ -103,4 +104,5 @@ fn eval_line(line: &str) {
 	while let Some(token) = it.next() {	
 		println!("{}",token);
 	}*/
+	*/
 }
