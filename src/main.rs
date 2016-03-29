@@ -8,7 +8,6 @@ extern crate regex;
 
 pub mod token_iterator;
 pub mod definitions;
-pub mod token_mapper;
 
 use token_iterator::TokenIterator;
 use token_iterator::Token;
