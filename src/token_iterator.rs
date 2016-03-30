@@ -9,34 +9,8 @@ use std::iter::Enumerate;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-/*
-#[derive(PartialEq, Debug)]
-enum PLVar<'a> {
-	PLString(&'a str),
-	PLBool(bool),
-	PLInt(i32)
-}
-*/
-
-#[derive(PartialEq,Debug)]
-pub struct Token<'a> {
-	line: usize,
-	column: usize,
-	lexeme: &'a str,
-	token_type: TokenType,
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum TokenType {
-	single_char,
-	two_char,
-	keyword,
-	integer,
-	string_literal,
-	identifier,
-	NA,
-}
-
+use token::Token;
+use token::TokenType;
 
 pub struct TokenIterator<'a>  {
 	text: &'a str,
@@ -48,7 +22,6 @@ pub struct TokenIterator<'a>  {
 	current_line_char_pos: usize,
 	current_line: &'a str,
 
-	current_column: usize,
 	slice_start: usize,
 
 	initialized: bool
@@ -73,13 +46,13 @@ impl<'a>  TokenIterator<'a>  {
 		(TokenType::two_char, two_char_token),
 		(TokenType::single_char, single_char_token),
 		(TokenType::integer, integer));
+		let src = string.trim_left_matches("\u{feff}"); //strip BOM
 
 		let t = TokenIterator {
-			current_column: 0,
 			initialized: false,
-            text: string,
+            text: src,
 			allRegex: allRegex,
-			lines: string.lines().enumerate(),
+			lines: src.lines().enumerate(),
 			current_line: "",
 			slice_start: 0,
 			current_line_number: 1,
@@ -89,9 +62,9 @@ impl<'a>  TokenIterator<'a>  {
     }
 
 	fn handle_end_of_line(&mut self) -> bool {
-		println!("checking end of line, current char pos {}, line len {}", self.current_line_char_pos, self.current_line.len());
+		//println!("{}, {}", self.current_line_char_pos, self.current_line.len());
+		//self.visualize_line_slice("", self.current_line_char_pos, self.current_line.len());
 		if(self.current_line_char_pos >= self.current_line.len() ) { //get next line chars iterator if at the end
-			println!("Self line chars is none");
 			match self.lines.next() {
 				Some((line_number, line)) => {
 					if(!self.initialized) {
@@ -99,7 +72,6 @@ impl<'a>  TokenIterator<'a>  {
 					} else {
 						self.slice_start += 1;
 					}
-					println!("Setting line counter to {}: {}", line_number, line);
 					self.current_line_number = line_number;
 					self.current_line = line;
 					self.current_line_char_pos = 0;
@@ -117,13 +89,13 @@ impl<'a>  TokenIterator<'a>  {
 	fn visualize_line_pos(&self, pos: usize) {
 		let line1 = self.current_line;
 		let mut buffer = String::new();
-		for x in 0 .. pos+1 {
+		for _ in 0 .. pos+1 {
 			buffer.push(' ');
 		}
 		buffer.push('^');
 
 		println!("#####################");
-		println!("{:?}", line1);
+		println!("{}", line1);
 		println!("{}", buffer);
 		println!("#####################");
 	}
@@ -131,13 +103,13 @@ impl<'a>  TokenIterator<'a>  {
 	fn visualize_line_slice(&self, slice: &str, start: usize, end: usize) {
 		let line1 = self.current_line;
 		let mut buffer = String::new();
-		for x in 0 .. start+1 {
+		for _ in 0 .. start {
 			buffer.push(' ');
 		}
 		buffer.push('^');
 
 		if(end - start > 0){
-			for x in 0 .. (end - start - 1) {
+			for _ in 0 .. (end - start - 1) {
 				buffer.push(' ');
 			}
 
@@ -146,8 +118,8 @@ impl<'a>  TokenIterator<'a>  {
 
 		println!("#####################");
 
-		println!("slice: \t{:?}",slice);
-		println!("line: \t{:?}",line1);
+		println!("slice: \t{}",slice);
+		println!("line: \t{}",line1);
 		println!("      \t{}",buffer);
 		println!("{}-{}",start, end);
 		println!("#####################");
@@ -175,12 +147,13 @@ impl<'a> Iterator for TokenIterator<'a> {
 		let mut token_type = TokenType::NA;
 
 		for column in self.current_line_char_pos .. self.current_line.len()+1 {
+			//println!("{}",self.current_line.chars().nth(column).unwrap_or(' '));
 			unsafe {
 				lexeme_candidate = self.current_line.slice_unchecked(self.current_line_char_pos, column);
 			}
+			//println!("{}",lexeme_candidate);
 
-
-			if ( !skipped_initial_whitespace && lexeme_candidate == " " ) {
+			if ( !skipped_initial_whitespace && lexeme_candidate.chars().nth(0).unwrap_or('a').is_whitespace() ) {
 				//skip rest of whitespace
 				skipping_whitespace = true;
 				self.current_line_char_pos += 1;
@@ -188,50 +161,40 @@ impl<'a> Iterator for TokenIterator<'a> {
 			} else if (skipping_whitespace && lexeme_candidate != " ") {
 				skipped_initial_whitespace = true;
 			}
-			println!("\nlooping regexes for slice: {:?} ", lexeme_candidate);
+
 			for tuple_ref in self.allRegex.iter() {
 				let (tokentype, ref rex): (TokenType, Regex) = *tuple_ref;
-				println!("checking type {:?} for {:?}", tokentype, lexeme_candidate);
 				if let Some((start, end)) = rex.find(lexeme_candidate) {
 					let line_pos_start = self.current_line_char_pos+start;
 					let line_pos_end = self.current_line_char_pos+end;
-					println!("Found {:?}  {:?}", tokentype, lexeme_candidate);
-
 					if(line_pos_start <= t_start && line_pos_end > t_end) {
 
 						//self.visualize_line_slice(lexeme_candidate, line_pos_start, line_pos_end);
 
-
 						lexeme = lexeme_candidate;
 						t_start = line_pos_start;
 						t_end = column;
-
 						token_start_on_line = line_pos_start;
 						token_type = tokentype;
 						found = true;
 					}
 				}
 			}
-			//println!(" ");
 		}
 
 		if found {
-			//println!("token_start_on_line = {}, t_start = {}, self.current_line_char_pos (0 ind) = {}",
-			//		token_start_on_line, t_start, self.current_line_char_pos);
 			token = Some(Token{
 				line: self.current_line_number + 1,
-				column: token_start_on_line+1,
+				column: token_start_on_line + 1,
 				lexeme: lexeme,
 				token_type: token_type});
 
 			//set next slice start on line
-
 			self.current_line_char_pos = t_end;
 
+		} else {
+			return self.next(); //not found, try again. EOL breaks recursive iteration
 		}
-//		println!(
-//		"##################################################################################################");
-		println!("{:?}", token);
 		token
 	}
 }
@@ -243,6 +206,18 @@ fn tokenize_two_consecutive() -> () {
 	let mut iterator = TokenIterator::new(code);
 	assert_eq!(Some(Token{line:1, column: 1, lexeme: "var", token_type: TokenType::keyword}),iterator.next());
 	assert_eq!(Some(Token{line:1, column: 5, lexeme: "X", token_type: TokenType::identifier}),iterator.next());
+}
+
+#[test]
+fn tokenize_two_consecutive_file_3() -> () {
+	let code = include_str!("../sample3.txt");
+	println!("{}", code);
+	let mut iterator = TokenIterator::new(code);
+	assert_eq!(Some(Token{line:1, column: 1, lexeme: "print", token_type: TokenType::keyword}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 7, lexeme: "\"Give a number\"", token_type: TokenType::string_literal}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 22, lexeme: ";", token_type: TokenType::single_char}),iterator.next());
+	assert_eq!(Some(Token{line:2, column: 1, lexeme: "var", token_type: TokenType::keyword}),iterator.next());
+	assert_eq!(Some(Token{line:2, column: 5, lexeme: "n", token_type: TokenType::identifier}),iterator.next());
 }
 
 #[test]
