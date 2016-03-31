@@ -1,6 +1,4 @@
-﻿use regex;
-use regex::Regex;
-use std::str::FromStr;
+﻿use std::str::FromStr;
 use std::str::Lines;
 use std::cmp;
 use std::i32;
@@ -12,11 +10,15 @@ use std::str::CharIndices;
 use token::Token;
 use token::TokenType;
 
+const single_char_token: &'static [&'static str] = &["+","-","*","/","<","=","&","!","(",")",";",".",":"];
+const two_char_token: &'static [&'static str] = &["..",":="];
+const keyword: &'static [&'static str] = &["assert","string","print","bool","read","var","for","end","int","in","do"];
+
 pub struct TokenIterator<'a>  {
 	text: &'a str,
 	lines: Enumerate<Lines<'a>>,
 
-	allRegex: Vec<(TokenType,Regex)>,
+	token_matchers: Vec<(TokenType, fn(&str) -> bool)>,
 
 	current_line_number: usize,
 	current_line_char_pos: usize,
@@ -27,31 +29,25 @@ pub struct TokenIterator<'a>  {
 	initialized: bool
 }
 
+
 impl<'a>  TokenIterator<'a>  {
 	//type Item = str;
 
 	pub fn new(string: &'a str) -> TokenIterator {
 
-		let single_char_token = Regex::new(r"\+|-|\*|/|<|=|&|!|\(|\)|;|\.|:").unwrap();
-		let two_char_token = Regex::new(r"(\.{2})|(:={1})").unwrap();
-		let keyword = Regex::new(r"(assert)|(string)|(print)|(bool)|(read)|(var)|(for)|(end)|(int)|(in)|(do)").unwrap();
-		let integer = Regex::new(r"\b\d+\b").unwrap();
-		let string_literal = Regex::new(r#"^"([^"\\]|\\.)*"$"#).unwrap();
-		let identifier = Regex::new(r"^[A-Za-z][A-Za-z0-9]*|([A-Za-z]+[0-9]*)").unwrap();
-
-		let allRegex: Vec<(TokenType, Regex)> = vec!(
-		(TokenType::string_literal, string_literal),
-		(TokenType::keyword, keyword),
-		(TokenType::identifier, identifier),
-		(TokenType::two_char, two_char_token),
-		(TokenType::single_char, single_char_token),
-		(TokenType::integer, integer));
+		let token_matchers: Vec<(TokenType, fn(&str) -> bool)> = vec!(
+		(TokenType::string_literal, is_string_literal),
+		(TokenType::keyword, is_keyword_token),
+		(TokenType::identifier, is_identifier),
+		(TokenType::two_char, is_two_char_token),
+		(TokenType::single_char, is_single_char_token),
+		(TokenType::integer, is_integer));
 		let src = string.trim_left_matches("\u{feff}"); //strip BOM
 
 		let t = TokenIterator {
 			initialized: false,
             text: src,
-			allRegex: allRegex,
+			token_matchers: token_matchers,
 			lines: src.lines().enumerate(),
 			current_line: "",
 			slice_start: 0,
@@ -145,6 +141,7 @@ impl<'a> Iterator for TokenIterator<'a> {
 		let mut t_start = usize::MAX;
 		let mut t_end = usize::MIN;
 		let mut token_type = TokenType::NA;
+		let mut longest_lexeme = usize::MIN;
 
 		for column in self.current_line_char_pos .. self.current_line.len()+1 {
 			//println!("{}",self.current_line.chars().nth(column).unwrap_or(' '));
@@ -162,15 +159,16 @@ impl<'a> Iterator for TokenIterator<'a> {
 				skipped_initial_whitespace = true;
 			}
 
-			for tuple_ref in self.allRegex.iter() {
-				let (tokentype, ref rex): (TokenType, Regex) = *tuple_ref;
-				if let Some((start, end)) = rex.find(lexeme_candidate) {
-					let line_pos_start = self.current_line_char_pos+start;
-					let line_pos_end = self.current_line_char_pos+end;
-					if(line_pos_start <= t_start && line_pos_end > t_end) {
+			for tuple_ref in self.token_matchers.iter() {
+				let (tokentype, matcher_fn): (TokenType, fn(&str) -> bool) = *tuple_ref;
+				if(matcher_fn(lexeme_candidate)) {
+					let line_pos_start = self.current_line_char_pos;
+					let line_pos_end = self.current_line_char_pos + lexeme_candidate.len();
+					let lexeme_length = lexeme_candidate.chars().count();
+					if(lexeme_length > longest_lexeme) { //prioritize length
 
-						//self.visualize_line_slice(lexeme_candidate, line_pos_start, line_pos_end);
-
+						//println!("New longest lexeme {:?}, {:?}, {:?}", lexeme_candidate ,tokentype, lexeme_length);
+						longest_lexeme = lexeme_length;
 						lexeme = lexeme_candidate;
 						t_start = line_pos_start;
 						t_end = column;
@@ -197,6 +195,65 @@ impl<'a> Iterator for TokenIterator<'a> {
 		}
 		token
 	}
+}
+
+fn is_single_char_token(lexeme: &str) -> bool {single_char_token.iter().any(|&x| x == lexeme)}
+
+fn is_two_char_token(lexeme: &str) -> bool {two_char_token.iter().any(|&x| x == lexeme)}
+
+fn is_keyword_token(lexeme: &str) -> bool {	keyword.iter().any(|&x| x == lexeme)}
+
+fn is_string_literal(lexeme: &str) -> bool {
+	let starts_with_quote = lexeme.starts_with("\"");
+	let mut chars = lexeme.chars();
+	let mut escape_next = false;
+	let mut num_unescaped_quotes = 0;
+	let mut last_ch = ' ';
+	while let Some(ch) = chars.next() {
+		last_ch = ch;
+		match ch {
+			'\\' => escape_next = true,
+			'"'	=> {
+				if(!escape_next) {
+					num_unescaped_quotes += 1;
+				}
+			}
+			_ => escape_next = false
+		}
+	}
+	starts_with_quote && last_ch == '"' && num_unescaped_quotes % 2 == 0
+
+}
+
+fn is_integer(lexeme: &str) -> bool {lexeme.parse::<i32>().is_ok()}
+
+fn is_identifier(lexeme: &str) -> bool {
+	let allAreAlphaNum = lexeme.chars().all(|ch: char| {
+		ch.is_alphanumeric() || ch == '_'
+	});
+	let firstIsAlphabetic = lexeme.chars().nth(0).unwrap_or('1').is_alphabetic();
+	firstIsAlphabetic && allAreAlphaNum
+}
+
+#[test]
+fn recornize_identifier() -> () {
+	assert_eq!(false, is_identifier("var X : int"));
+	assert_eq!(false, is_identifier("var X : i"));
+	assert_eq!(true, is_identifier("X"));
+	assert_eq!(true, is_identifier("awesome_var1"));
+	assert_eq!(false, is_identifier("1illegalvar"));
+}
+
+#[test]
+fn recognize_string_literal() -> () {
+	let ok = r#""foo bar baz""#;
+	let missing_quote = r#""foo bar baz"#;
+	let unescaped_quote = r#""foo "bar baz""#;
+	let escaped_quote = r#""foo \"bar baz""#;
+	assert_eq!(true, is_string_literal(ok));
+	assert_eq!(false, is_string_literal(missing_quote));
+	assert_eq!(false, is_string_literal(unescaped_quote));
+	assert_eq!(true, is_string_literal(escaped_quote));
 }
 
 #[test]
