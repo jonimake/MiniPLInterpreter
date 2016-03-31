@@ -25,7 +25,6 @@ pub struct TokenIterator<'a>  {
 	current_line: &'a str,
 
 	slice_start: usize,
-
 	initialized: bool
 }
 
@@ -234,6 +233,20 @@ fn is_identifier(lexeme: &str) -> bool {
 	let firstIsAlphabetic = lexeme.chars().nth(0).unwrap_or('1').is_alphabetic();
 	firstIsAlphabetic && allAreAlphaNum
 }
+
+
+
+#[test]
+fn recornize_integer() -> () {
+	assert_eq!(false, is_integer("1.0"));
+	assert_eq!(true, is_integer("1"));
+	assert_eq!(true, is_integer("+1"));
+	assert_eq!(true, is_integer("-1"));
+	assert_eq!(true, is_integer("-123"));
+	assert_eq!(true, is_integer("123"));
+	assert_eq!(true, is_integer("+123"));
+}
+
 
 #[test]
 fn recornize_identifier() -> () {

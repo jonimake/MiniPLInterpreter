@@ -4,13 +4,12 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-extern crate regex;
-
+pub mod token;
 pub mod token_iterator;
-pub mod definitions;
+pub mod parser;
 
 use token_iterator::TokenIterator;
-use token_iterator::Token;
+use token::Token;
 
 use std::error::Error;
 use std::fs::File;
@@ -40,31 +39,32 @@ fn main() {
 
 	println!("The current directory is {}", absolute_path.display());
 	absolute_path.push(path);
+	let exit_keyword = "exit";
 	println!("The file is {}", absolute_path.display());
-
 	let exitString = "exit".to_string();
 	match (path.exists() && path.is_file()) {
 		true => { //tokenize file
 
 			let f = File::open(path).unwrap();
 			let mut reader = BufReader::new(f);
-			for line in reader.lines() {
-					let line = line.unwrap();
-					eval_line(&line);
-			}
-			/*let f = try!(File::open(path));
-				let mut reader = BufReader::new(f);
-				for line in reader.lines() {
-					let line = try!(line);
-					eval_line(&line);
-				}*/
-		}, 
+
+			let mut buffer = String::new();
+			reader.read_to_string(&mut buffer).unwrap();
+			println!("File contents...");
+			println!("{}", buffer);
+
+			buffer.trim_left_matches("\u{feff}");
+
+			eval_file(&buffer);
+		},
 		false => { //capture input and start tokenizing that
+			println!("Type {:?} to exit", exit_keyword);
+			println!("MiniPL> ");
 			let stdin = io::stdin();
 			for line in stdin.lock().lines() {
 				match line {
 					Ok(content) => {
-						if(&content == "exit") {break;}
+						if(content == exit_keyword) {break;}
 						eval_line(&content);
 					},
 					Err(errmsg) => {println!("Error: {}", errmsg); break},
@@ -74,10 +74,25 @@ fn main() {
 	};
 }
 
+fn eval_file(file_contents: &str) {
+	println!("{}\n",file_contents);
+
+	let mut token_it = TokenIterator::new(file_contents);
+	parser::interpret(token_it);
+
+}
+
 fn eval_line(line: &str) {
+	println!("{:?}", line);
 	//let mut variables = HashMap::new();
-	//let mut it = TokenIterator::new(line);
-	/*let all_tokens: Vec<&Token> = it.collect();
+	let mut it = TokenIterator::new(line);
+	let all_tokens: Vec<Token> = it.collect();
+
+	for x in all_tokens {
+		println!("{:?}", x);
+	}
+
+	/*
 	let mut token_it = all_tokens.into_iter().peekable();
 	while let Some(token) = token_it.next() {
 		match token {
