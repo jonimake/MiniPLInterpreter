@@ -7,9 +7,11 @@
 pub mod token;
 pub mod token_iterator;
 pub mod parser;
+pub mod ast;
 
 use token_iterator::TokenIterator;
 use token::Token;
+use parser::Parser;
 
 use std::error::Error;
 use std::fs::File;
@@ -78,7 +80,9 @@ fn eval_file(file_contents: &str) {
 	println!("{}\n",file_contents);
 
 	let mut token_it = TokenIterator::new(file_contents);
-	parser::interpret(token_it);
+	let tokens: Vec<Token> = token_it.collect();
+	let mut p = Parser::new(tokens);
+	p.interpret();
 
 }
 

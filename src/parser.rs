@@ -17,7 +17,7 @@
            |   <var_ident>
            |   "(" expr ")"
 
- <type>   ::=  "int" | "string" | "bool"
+ <type>   ::=  "int" | "string" | "bool"[unary_op]
  <var_ident> ::= <ident>
 
  <reserved keyword> ::=
@@ -33,6 +33,10 @@ stmts   -> stmt stmts                           {var, id, for, read, print, asse
 stmts   -> e
 
 stmt    -> var id : type [:= expr]              {var}
+
+stmt    -> var id : type var_tail
+var_tail -> := expr | e                         {:=}
+
 stmt    -> id := expr                           {id}
 stmt    -> for id in expr .. do stmts end for   {for}
 stmt    -> read id                              {read}
@@ -40,12 +44,14 @@ stmt    -> print expr                           {print}
 stmt    -> assert ( expr )                      {assert}
 
 expr    -> opnd op opnd
-expr    -> unary_op opnd                        {!}
+expr    -> [unary_op] opnd                        {!}
 
 opnd    -> int                                  {1,2,3,4,5,6,7,8,9}
 opnd    -> string
-opnd    -> id
+opnd    -> id                                   {a-zA-Z}
 opnd    -> ( expr )                             {(}
+
+op      -> + | - | * | / | < | = | & | !        {+, -, *, /, <, =, &, !}
 
 type    -> integer                              {integer}
 type    -> string                               {string}
@@ -55,8 +61,8 @@ id      -> regex                                {a-zA-Z}
 
 */
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum ParseToken<'a> {
+#[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
+pub enum ParseToken<'a> {
     var_decl,
     id(&'a str),
     type_decl,      //:
@@ -85,9 +91,10 @@ enum ParseToken<'a> {
     sub,
     mul,
     div,
+    not,
 
     range,
-    NA
+    undefined
 }
 
 
@@ -95,13 +102,195 @@ enum PredictSet {
     Integer
 }
 
+#[derive(Clone, Copy, PartialEq, Hash, Eq, Debug)]
+struct TypeVal<'a> {
+    val_type: Option<ParseToken<'a>>,
+    val: Option<ParseToken<'a>>,
+}
+
 use std::iter::Iterator;
+use std::iter::Peekable;
+use std::vec::IntoIter;
+use std::collections::HashMap;
 use token::Token;
 use token::TokenType;
 use std::boxed::Box;
+use ast::Ast;
 
-struct Parser<'a> {
-    tokens: Iterator<Item = ParseToken<'a>>
+pub struct Parser<'a> {
+    token_stack: Vec<ParseToken<'a>>,
+    variables: HashMap<ParseToken<'a>, Option<TypeVal<'a>>>,
+    operand_stack: Vec<ParseToken<'a>>,
+    operator_stack: Vec<ParseToken<'a>>
+}
+
+impl<'a> Parser<'a> {
+    pub fn new(tokens: Vec<Token<'a>>) -> Parser<'a> {
+        let mut refined_tokens: Vec<ParseToken<'a>> = tokens.into_iter().map(refine_type).collect();
+        refined_tokens.reverse();
+        Parser {
+            token_stack: refined_tokens,
+            variables: HashMap::new(),
+            operand_stack: Vec::new(),
+            operator_stack: Vec::new()
+        }
+    }
+
+
+    pub fn interpret (&mut self) {
+        self.program();
+    }
+
+    fn program(&mut self) {
+        let mut statements: Vec<Ast<'a>> = Vec::new();
+        while(!self.token_stack.is_empty()) {
+            let ast: Ast<'a> = self.statement();
+            statements.push(ast);
+            println!("Statements: {:?}", statements);
+            let statement_end = self.token_stack.pop();
+            if(statement_end != Some(ParseToken::statement_end)) {panic!("Unexpected end of statement")}
+        }
+    }
+
+    /*
+    stmt    -> var id : type [:= expr]              {var}
+    stmt    -> id := expr                           {id}
+    stmt    -> for id in expr .. do stmts end for   {for}
+    stmt    -> read id                              {read}
+    stmt    -> print expr                           {print}
+    stmt    -> assert ( expr )                      {assert}
+    */
+    fn statement(&mut self) -> Ast<'a> {
+        let t = self.token_stack.last().cloned();
+        let mut ntype = ParseToken::undefined;
+        let node: Ast<'a> = match t {
+            Some(ParseToken::var_decl) => {self.var_decl()},
+            Some(ParseToken::id(var_id)) => {panic!("todo")},
+            Some(ParseToken::read) => {panic!("todo")},
+            Some(ParseToken::print) => {panic!("todo")},
+            Some(ParseToken::assert) => {panic!("todo")},
+            _ => panic!("unexpected token {:?}", t)
+        };
+        //Box::new(Ast{node_type: ntype, lhs: None, rhs: None, value: None})
+        node
+    }
+
+    fn var_decl(&mut self) -> Ast<'a> {
+
+        if(self.token_stack.pop() != Some(ParseToken::var_decl)) {panic!("syntax error, no var")}
+        let id: Option<ParseToken<'a>> = self.token_stack.pop();
+
+        let id = match id {
+            Some(ParseToken::id(_)) => {id.unwrap()},
+            _ => panic!("no")
+        };
+        if( self.token_stack.pop() != Some(ParseToken::type_decl)) {panic!("syntax error, ':' required")}
+
+        let ttype = self.token_stack.pop();
+        let ttype = match ttype {
+            Some(ParseToken::integer_type) => {ttype.unwrap()},
+            Some(ParseToken::string_type) => {ttype.unwrap()},
+            Some(ParseToken::boolean_type) => {ttype.unwrap()},
+            _ => panic!("Not a valid type {:?}", ttype)
+        };
+
+        let var_node = Ast{node_type: ParseToken::var_decl, lhs: None, value_type: ttype, rhs: None, value: id};
+
+        if (self.token_stack.last().cloned() == Some(ParseToken::assignment)) {
+            let assignment = self.token_stack.pop();
+            let expr_node = self.expression();
+            let assignment_node = Ast{
+                node_type: ParseToken::assignment,
+                lhs: Some(Box::new(var_node)),
+                rhs: Some(Box::new(expr_node)),
+                value: ParseToken::undefined,
+                value_type: ParseToken::undefined};
+            println!("parsed expression");
+            assignment_node
+        } else {
+            var_node
+        }
+
+    }
+
+    //<expr>   ::=  <opnd> <op> <opnd>
+    //          |   [ <unary_op> ] <opnd>
+
+    fn expression(&mut self) -> Ast<'a> {
+
+        println!("stack: {:?}", self.token_stack);
+        let token = self.token_stack.last().cloned();
+        //let mut ast = Ast{node_type: ParseToken::undefined, lhs: None, rhs: None, value: ParseToken::undefined, value_type: ParseToken::undefined};
+        println!("Expression: {:?}", token);
+        let ast: Ast<'a> = match token {
+            Some(ParseToken::not) => { //handle unary op case
+                self.expression_tail()
+            },
+            Some(_) => {
+                let lhs = self.operand();
+                if(self.token_stack.last().cloned() != Some(ParseToken::statement_end)) {
+                    let mut tail = self.expression_tail();
+                    tail.lhs = Some(Box::new(lhs));
+                    //let op = self.token_stack.pop();
+                    //let rhs = self.operand();
+                    tail
+                } else {
+                    lhs
+                }
+            }
+            _ => panic!("expression parse failure {:?}", token)
+        };
+        ast
+    }
+
+    fn expression_tail(&mut self) -> Ast<'a> {
+        println!("stack: {:?}", self.token_stack);
+        let t = self.token_stack.pop();
+        println!("Expr tail {:?}", t);
+        match t {
+            Some(ParseToken::not) => {
+                let lhs = self.expression();
+                Ast{node_type: t.unwrap(), lhs: Some(Box::new(lhs)), rhs: None, value: ParseToken::undefined, value_type: ParseToken::undefined}
+            }
+            Some(_) => { //some binary op
+                let rhs = self.operand();
+                Ast{node_type: t.unwrap(), lhs: None, rhs: Some(Box::new(rhs)), value: ParseToken::undefined, value_type: ParseToken::undefined}
+            }
+            _ => panic!("expression tail parse failure {:?}", t)
+        }
+    }
+
+
+    fn operand(&mut self) -> Ast<'a> {
+        let oprnd = self.token_stack.pop();
+        println!("Operand {:?}", oprnd);
+        let ast = match oprnd {
+            Some(ParseToken::lparen) => {
+                let expr = self.expression();
+                let rparen = self.token_stack.pop();
+                match rparen {
+                    Some(ParseToken::rparen) => {},
+                    _ => panic!("Missing right parenthesis")
+                }
+                expr
+            },
+            Some(ParseToken::integer(i)) => {
+                Ast{node_type: oprnd.unwrap(), lhs: None, rhs: None, value: oprnd.unwrap(), value_type: ParseToken::integer_type}
+            },
+            Some(ParseToken::string(str)) => {
+                Ast{node_type: oprnd.unwrap(), lhs: None, rhs: None, value: oprnd.unwrap(), value_type: ParseToken::string_type}
+            },
+            Some(ParseToken::boolean(bool)) => {
+                 Ast{node_type: oprnd.unwrap(), lhs: None, rhs: None, value: oprnd.unwrap(), value_type: ParseToken::boolean_type}
+             },
+             Some(ParseToken::id(id)) => {
+                Ast{node_type: oprnd.unwrap(), lhs: None, rhs: None, value: oprnd.unwrap(), value_type: oprnd.unwrap()}
+            }
+            _ => panic!("Operand parse error {:?}", oprnd)
+        };
+        ast
+    }
+
 }
 
 //let single_char_token = Regex::new(r"\+|-|\*|/|<|=|&|!|\(|\)|;|\.|:").unwrap();
@@ -117,6 +306,7 @@ fn get_single_char_type(token: Token) -> ParseToken {
         "(" => ParseToken::lparen,
         ")" => ParseToken::rparen,
         "=" => ParseToken::equal,
+        "!" => ParseToken::not,
         _   => panic!("Parse error while mapping token {:?}, line {}, col {}", lexeme, token.line, token.column)
     }
 }
@@ -176,40 +366,26 @@ fn refine_type(token: Token) -> ParseToken {
     };
     parsetoken
 }
-
-
-pub fn interpret<'a, I> (mut tokens: I) -> ()
-    where I: Iterator< Item = Token<'a> > {
-    let tokens = tokens.map(refine_type);
-    //let mut variables = HashMap::new();
-    for t in tokens {
-
-        println!("{:?}", t);
-    }
-
-
-    /*
-    while let Some(token) = tokens.next() {
-        //refine token type
-        let parsetoken = refine_type(token);
-        println!("{:?}", parsetoken);
-    }*/
-
-    println!("Done");
-}
-
-
-pub fn  get_ast<'a>(tokens: &mut Iterator< Item = Token>) -> ()  {
-
-    while let Some(token) = tokens.next() {
-        //refine token type
-        let parsetoken = refine_type(token);
-        println!("{:?}", parsetoken);
-    }
-
-}
-
+//var i : int := 1 + 2
 #[test]
-fn test_add_token() -> () {
+fn test_parse_expression() -> () {
+    let tokens = vec!(
+        Token{line: 1, column: 1, lexeme: "var", token_type:TokenType::keyword},
+        Token{line: 1, column: 5, lexeme: "i", token_type:TokenType::identifier},
+        Token{line: 1, column: 7, lexeme: ":", token_type:TokenType::single_char},
+        Token{line: 1, column: 9, lexeme: "int", token_type:TokenType::keyword},
+        Token{line: 1, column: 17-4, lexeme: ":=", token_type:TokenType::two_char},
+        Token{line: 1, column: 20-4, lexeme: "1", token_type:TokenType::integer},
+        Token{line: 1, column: 22-4, lexeme: "+", token_type:TokenType::single_char},
+        Token{line: 1, column: 24-4, lexeme: "2", token_type:TokenType::integer},
+        Token{line: 1, column: 25-4, lexeme: ";", token_type:TokenType::single_char}
+    );
+    let mut p = Parser::new(tokens);
+    p.interpret();
 }
-
+/*
+pub line: usize,
+pub column: usize,
+pub lexeme: &'a str,
+pub token_type: TokenType
+*/
