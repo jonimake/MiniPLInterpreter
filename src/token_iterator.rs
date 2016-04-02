@@ -224,7 +224,9 @@ fn is_string_literal(lexeme: &str) -> bool {
 
 }
 
-fn is_integer(lexeme: &str) -> bool {lexeme.parse::<i32>().is_ok()}
+fn is_integer(lexeme: &str) -> bool {
+	!lexeme.starts_with("-") && lexeme.parse::<i32>().is_ok()
+}
 
 fn is_identifier(lexeme: &str) -> bool {
 	let allAreAlphaNum = lexeme.chars().all(|ch: char| {
@@ -241,8 +243,8 @@ fn recornize_integer() -> () {
 	assert_eq!(false, is_integer("1.0"));
 	assert_eq!(true, is_integer("1"));
 	assert_eq!(true, is_integer("+1"));
-	assert_eq!(true, is_integer("-1"));
-	assert_eq!(true, is_integer("-123"));
+	assert_eq!(false, is_integer("-1"));
+	assert_eq!(false, is_integer("-123"));
 	assert_eq!(true, is_integer("123"));
 	assert_eq!(true, is_integer("+123"));
 }
@@ -267,6 +269,22 @@ fn recognize_string_literal() -> () {
 	assert_eq!(false, is_string_literal(missing_quote));
 	assert_eq!(false, is_string_literal(unescaped_quote));
 	assert_eq!(true, is_string_literal(escaped_quote));
+}
+
+#[test]
+fn tokenize_integer_assignment() -> () {
+	let code = r#"var x : int :=4-2;"#;
+	println!("{}", code);
+	let mut iterator = TokenIterator::new(code);
+	assert_eq!(Some(Token{line:1, column: 1, lexeme: "var", token_type: TokenType::keyword}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 5, lexeme: "x", token_type: TokenType::identifier}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 7, lexeme: ":", token_type: TokenType::single_char}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 9, lexeme: "int", token_type: TokenType::keyword}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 13, lexeme: ":=", token_type: TokenType::two_char}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 15, lexeme: "4", token_type: TokenType::integer}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 16, lexeme: "-", token_type: TokenType::single_char}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 17, lexeme: "2", token_type: TokenType::integer}),iterator.next());
+	assert_eq!(Some(Token{line:1, column: 18, lexeme: ";", token_type: TokenType::single_char}),iterator.next());
 }
 
 #[test]

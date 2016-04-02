@@ -138,6 +138,7 @@ impl<'a> Parser<'a> {
 
 
     pub fn interpret (&mut self) {
+        println!("{:?}",self.token_stack);
         self.program();
     }
 
@@ -151,6 +152,10 @@ impl<'a> Parser<'a> {
             if(statement_end != Some(ParseToken::statement_end)) {panic!("Unexpected end of statement")}
         }
     }
+
+    /*fn statements(&mut self) {
+
+    }*/
 
     /*
     stmt    -> var id : type [:= expr]              {var}
@@ -166,7 +171,7 @@ impl<'a> Parser<'a> {
         let node: Ast<'a> = match t {
             Some(ParseToken::var_decl) => {self.var_decl()},
             Some(ParseToken::id(var_id)) => {self.var_assignment()},
-            Some(ParseToken::for_loop_begin) => {panic!("todo for loop")},
+            Some(ParseToken::for_loop_begin) => {self.for_loop()},
             Some(ParseToken::read) => {self.read()},
             Some(ParseToken::print) => {self.print()},
             Some(ParseToken::assert) => {self.assert()},
@@ -176,9 +181,43 @@ impl<'a> Parser<'a> {
         node
     }
 
+//"for" <var_ident> "in" <expr> ".." <expr> "do"
+//<stmts> "end" "for"
+    fn for_loop(&mut self) -> Ast<'a> {
+        let t = self.token_stack.pop();
+        if(t.unwrap() != ParseToken::for_loop_begin) {panic!("Unexpected token {:?}", t)}
+        let var_id = self.token_stack.pop();
+        let in_word = self.token_stack.pop();
+
+        let expr1 = self.expression();
+        let dots = self.token_stack.pop();
+        let expr2 = self.expression();
+
+        while(self.token_stack.last().cloned() != Some(ParseToken::for_loop_end)) {
+            self.for_loop_body();
+        }
+        let do_word = self.token_stack.pop();
+
+        panic!("Todo loop");
+    }
+
+    fn for_loop_body(&mut self) -> Ast<'a> {
+        panic!("Todo loop body parsing")
+    }
+
+    fn for_loop_end(&mut self) -> Ast<'a> {
+        panic!("Todo loop end parsing")
+    }
+
+    fn expect(actual: Option<ParseToken<'a>>, expected: Option<ParseToken<'a>>) -> () {
+        panic!("Expected {:?} actual {:?}", expected, actual);
+    }
+
     fn assert(&mut self) -> Ast<'a> {
         let assert = self.token_stack.pop();
+        let lparen = self.token_stack.pop();
         let expr = self.expression();
+        let rparen = self.token_stack.pop();
         Ast{node_type: assert.unwrap(), lhs: Some(Box::new(expr)), value_type: ParseToken::assert, rhs: None, value: ParseToken::undefined}
     }
 
@@ -313,6 +352,17 @@ impl<'a> Parser<'a> {
                 }
                 expr
             },
+            //handle negative operand
+            Some(ParseToken::sub) => {
+                let maybe_num = self.token_stack.last().cloned();
+                match maybe_num {
+                    Some(ParseToken::integer(i)) => {
+                        self.token_stack.pop(); //pop the number from stack
+                        Ast{node_type: ParseToken::integer(i), lhs: None, rhs: None, value: ParseToken::integer(-i), value_type: ParseToken::integer_type}
+                    },
+                    _ => panic!("Error parsing negative number")
+                }
+            }
             Some(ParseToken::integer(i)) => {
                 Ast{node_type: oprnd.unwrap(), lhs: None, rhs: None, value: oprnd.unwrap(), value_type: ParseToken::integer_type}
             },
@@ -422,6 +472,70 @@ fn test_parse_expression() -> () {
     let mut p = Parser::new(tokens);
     p.interpret();
 }
+
+#[test]
+fn test_parse_expression_parens() {
+//var X : int := ((1 + 2)*2);
+    let tokens = vec!(
+    Token{line: 1, column: 1, lexeme: "var", token_type:TokenType::keyword},
+    Token{line: 1, column: 5, lexeme: "X", token_type:TokenType::identifier},
+    Token{line: 1, column: 7, lexeme: ":", token_type:TokenType::single_char},
+    Token{line: 1, column: 9, lexeme: "int", token_type:TokenType::keyword},
+    Token{line: 1, column: 17-4, lexeme: ":=", token_type:TokenType::two_char},
+    Token{line: 1, column: 16, lexeme: "(", token_type:TokenType::single_char},
+    Token{line: 1, column: 17, lexeme: "(", token_type:TokenType::single_char},
+    Token{line: 1, column: 18, lexeme: "1", token_type:TokenType::integer},
+    Token{line: 1, column: 20, lexeme: "+", token_type:TokenType::single_char},
+    Token{line: 1, column: 22, lexeme: "2", token_type:TokenType::integer},
+    Token{line: 1, column: 23, lexeme: ")", token_type:TokenType::single_char},
+    Token{line: 1, column: 24, lexeme: "*", token_type:TokenType::single_char},
+    Token{line: 1, column: 25, lexeme: "2", token_type:TokenType::integer},
+    Token{line: 1, column: 26, lexeme: ")", token_type:TokenType::single_char},
+    Token{line: 1, column: 27, lexeme: ";", token_type:TokenType::single_char}
+    );
+    let mut p = Parser::new(tokens);
+    p.interpret();
+}
+
+#[test]
+fn test_assert_expr() {
+//assert (a = (4-2));
+    let tokens = vec!(
+    Token{line: 1, column: 1, lexeme: "assert", token_type:TokenType::keyword},
+    Token{line: 1, column: 5, lexeme: "(", token_type:TokenType::single_char},
+    Token{line: 1, column: 7, lexeme: "a", token_type:TokenType::identifier},
+    Token{line: 1, column: 9, lexeme: "=", token_type:TokenType::single_char},
+    Token{line: 1, column: 17-4, lexeme: "(", token_type:TokenType::single_char},
+    Token{line: 1, column: 16, lexeme: "4", token_type:TokenType::integer},
+    Token{line: 1, column: 17, lexeme: "-", token_type:TokenType::single_char},
+    Token{line: 1, column: 18, lexeme: "2", token_type:TokenType::integer},
+    Token{line: 1, column: 20, lexeme: ")", token_type:TokenType::single_char},
+    Token{line: 1, column: 22, lexeme: ")", token_type:TokenType::single_char},
+    Token{line: 1, column: 23, lexeme: ";", token_type:TokenType::single_char}
+    );
+    let mut p = Parser::new(tokens);
+    p.interpret();
+    //assert_eq!(true,false);
+}
+
+#[test]
+fn test_define_negative_number() {
+    //assert (a = (4-2));
+    let tokens = vec!(
+    Token{line: 1, column: 1, lexeme: "var", token_type:TokenType::keyword},
+    Token{line: 1, column: 5, lexeme: "x", token_type:TokenType::identifier},
+    Token{line: 1, column: 7, lexeme: ":", token_type:TokenType::single_char},
+    Token{line: 1, column: 9, lexeme: "int", token_type:TokenType::keyword},
+    Token{line: 1, column: 17-4, lexeme: ":=", token_type:TokenType::two_char},
+    Token{line: 1, column: 16, lexeme: "-", token_type:TokenType::single_char},
+    Token{line: 1, column: 17, lexeme: "4", token_type:TokenType::integer},
+    Token{line: 1, column: 18, lexeme: ";", token_type:TokenType::single_char},
+    );
+    let mut p = Parser::new(tokens);
+    p.interpret();
+    //assert_eq!(true,false);
+}
+
 /*
 pub line: usize,
 pub column: usize,

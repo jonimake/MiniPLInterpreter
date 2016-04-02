@@ -1,7 +1,1 @@
-var X : int := (5 + 2);
-X := X * 2;
-var Y : int;
-read Y;
-print Y;
-var a : int := 2;
-assert a = X;
+assert (a = (4-2));

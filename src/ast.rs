@@ -10,7 +10,8 @@ pub struct Ast<'a> {
     // Box type below is basically a reference to a heap stored
     // value that is needed for recursive struct references
     pub lhs: Option<Box<Ast<'a>>>,
-    pub rhs: Option<Box<Ast<'a>>>
+    pub rhs: Option<Box<Ast<'a>>>,
+    //pub statements: Option<Vec<Box<Ast<'a>>>>
 }
 
 
