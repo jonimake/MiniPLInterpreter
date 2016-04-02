@@ -3,3 +3,5 @@ X := X * 2;
 var Y : int;
 read Y;
 print Y;
+var a : int := 2;
+assert a = X;

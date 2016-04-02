@@ -166,13 +166,20 @@ impl<'a> Parser<'a> {
         let node: Ast<'a> = match t {
             Some(ParseToken::var_decl) => {self.var_decl()},
             Some(ParseToken::id(var_id)) => {self.var_assignment()},
+            Some(ParseToken::for_loop_begin) => {panic!("todo for loop")},
             Some(ParseToken::read) => {self.read()},
             Some(ParseToken::print) => {self.print()},
-            Some(ParseToken::assert) => {panic!("todo assert")},
+            Some(ParseToken::assert) => {self.assert()},
             _ => panic!("unexpected token {:?}", t)
         };
         //Box::new(Ast{node_type: ntype, lhs: None, rhs: None, value: None})
         node
+    }
+
+    fn assert(&mut self) -> Ast<'a> {
+        let assert = self.token_stack.pop();
+        let expr = self.expression();
+        Ast{node_type: assert.unwrap(), lhs: Some(Box::new(expr)), value_type: ParseToken::assert, rhs: None, value: ParseToken::undefined}
     }
 
     fn read(&mut self) -> Ast<'a> {
