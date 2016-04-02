@@ -167,7 +167,7 @@ impl<'a> Parser<'a> {
             Some(ParseToken::var_decl) => {self.var_decl()},
             Some(ParseToken::id(var_id)) => {self.var_assignment()},
             Some(ParseToken::read) => {self.read()},
-            Some(ParseToken::print) => {panic!("todo print")},
+            Some(ParseToken::print) => {self.print()},
             Some(ParseToken::assert) => {panic!("todo assert")},
             _ => panic!("unexpected token {:?}", t)
         };
@@ -180,6 +180,13 @@ impl<'a> Parser<'a> {
         let id = self.token_stack.pop();
         let id_box = Box::new(Ast{node_type: id.unwrap(), lhs: None, rhs: None, value: id.unwrap(), value_type: id.unwrap()});
         Ast{node_type: read.unwrap(), lhs: Some(id_box), value_type: ParseToken::undefined, rhs: None, value: read.unwrap()}
+    }
+
+    fn print(&mut self) -> Ast<'a> {
+        let print = self.token_stack.pop();
+        let expr = self.expression();
+
+        Ast{node_type: print.unwrap(), lhs: Some(Box::new(expr)), value_type: ParseToken::print, rhs: None, value: ParseToken::undefined}
     }
 
     fn var_decl(&mut self) -> Ast<'a> {
