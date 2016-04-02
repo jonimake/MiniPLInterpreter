@@ -165,14 +165,21 @@ impl<'a> Parser<'a> {
         let mut ntype = ParseToken::undefined;
         let node: Ast<'a> = match t {
             Some(ParseToken::var_decl) => {self.var_decl()},
-            Some(ParseToken::id(var_id)) => {panic!("todo")},
-            Some(ParseToken::read) => {panic!("todo")},
-            Some(ParseToken::print) => {panic!("todo")},
-            Some(ParseToken::assert) => {panic!("todo")},
+            Some(ParseToken::id(var_id)) => {self.var_assignment()},
+            Some(ParseToken::read) => {self.read()},
+            Some(ParseToken::print) => {panic!("todo print")},
+            Some(ParseToken::assert) => {panic!("todo assert")},
             _ => panic!("unexpected token {:?}", t)
         };
         //Box::new(Ast{node_type: ntype, lhs: None, rhs: None, value: None})
         node
+    }
+
+    fn read(&mut self) -> Ast<'a> {
+        let read = self.token_stack.pop();
+        let id = self.token_stack.pop();
+        let id_box = Box::new(Ast{node_type: id.unwrap(), lhs: None, rhs: None, value: id.unwrap(), value_type: id.unwrap()});
+        Ast{node_type: read.unwrap(), lhs: Some(id_box), value_type: ParseToken::undefined, rhs: None, value: read.unwrap()}
     }
 
     fn var_decl(&mut self) -> Ast<'a> {
@@ -210,7 +217,25 @@ impl<'a> Parser<'a> {
         } else {
             var_node
         }
+    }
 
+    fn var_assignment(&mut self) -> Ast<'a> {
+        let var_id = self.token_stack.pop();
+        let assignment = self.token_stack.pop();
+        let expr = self.expression();
+
+        Ast{node_type: assignment.unwrap(),
+            lhs: Some(Box::new(
+                Ast{
+                    node_type: var_id.unwrap(),
+                    value: var_id.unwrap(),
+                    value_type: var_id.unwrap(),
+                    rhs: None,
+                    lhs: None
+                })),
+            rhs: Some(Box::new(expr)),
+            value: ParseToken::undefined,
+            value_type: ParseToken::undefined}
     }
 
     //<expr>   ::=  <opnd> <op> <opnd>
