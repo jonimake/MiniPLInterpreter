@@ -235,26 +235,6 @@ impl<'a> Parser<'a> {
         Ast{node_type: ParseToken::for_loop, lhs: None, rhs: None, value: ParseToken::undefined, value_type: ParseToken::undefined}
     }
 
-    fn for_loop_body(&mut self) -> Ast<'a> {
-
-        let rhs = self.statement();
-        rhs
-
-    }
-
-    fn for_loop_end(&mut self) -> Ast<'a> {
-        let end_word = self.token_stack.pop();
-        if(end_word == Some(ParseToken::for_loop_end)) {
-            panic!("Unexpected word {:?}", end_word)
-        }
-
-        let for_word = self.token_stack.pop();
-        if(for_word == Some(ParseToken::for_loop_end)){
-            panic!("Unexpected word {:?}", for_word)
-        }
-        Ast{node_type: end_word.unwrap(), lhs: None, value_type: ParseToken::undefined, rhs: None, value: ParseToken::undefined}
-    }
-
     fn expect(actual: Option<ParseToken<'a>>, expected: Option<ParseToken<'a>>) -> () {
         panic!("Expected {:?} actual {:?}", expected, actual);
     }
@@ -288,7 +268,7 @@ impl<'a> Parser<'a> {
 
         let id = match id {
             Some(ParseToken::id(_)) => {id.unwrap()},
-            _ => panic!("no")
+            _ => panic!("no id defined")
         };
         if( self.token_stack.pop() != Some(ParseToken::type_decl)) {panic!("syntax error, ':' required")}
 
