@@ -79,11 +79,13 @@ pub enum ParseToken<'a> {
     print,
     assert,
 
+    for_loop,
     for_loop_begin,     //for
     for_loop_in,
     for_loop_do,
     for_loop_end,   //end
 
+    statement,
     statement_end,      //;
     lparen,
     rparen,
@@ -120,8 +122,8 @@ use ast::Ast;
 pub struct Parser<'a> {
     token_stack: Vec<ParseToken<'a>>,
     variables: HashMap<ParseToken<'a>, Option<TypeVal<'a>>>,
-    operand_stack: Vec<ParseToken<'a>>,
-    operator_stack: Vec<ParseToken<'a>>
+    //operand_stack: Vec<ParseToken<'a>>,
+    //operator_stack: Vec<ParseToken<'a>>
 }
 
 impl<'a> Parser<'a> {
@@ -131,16 +133,13 @@ impl<'a> Parser<'a> {
         Parser {
             token_stack: refined_tokens,
             variables: HashMap::new(),
-            operand_stack: Vec::new(),
-            operator_stack: Vec::new()
+            //operand_stack: Vec::new(),
+            //operator_stack: Vec::new()
         }
     }
 
 
-    pub fn interpret (&mut self) {
-        println!("{:?}",self.token_stack);
-        self.program();
-    }
+
 
     fn program(&mut self) {
         let mut statements: Vec<Ast<'a>> = Vec::new();
@@ -153,9 +152,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /*fn statements(&mut self) {
+    fn statements(&mut self) -> Ast<'a> {
+        let stmt = self.statement();
+        let end = self.token_stack.pop();
+        if (end != Some(ParseToken::statement_end)) {panic!("Unexpected end of statement {:?}", end)}
 
-    }*/
+        let mut statements_tail = None;
+        if(!self.token_stack.is_empty()) {
+            statements_tail = Some(Box::new(self.statements()));
+        }
+        Ast{node_type: ParseToken::statement, lhs: Some(Box::new(stmt)), rhs: statements_tail, value: ParseToken::undefined, value_type: ParseToken::undefined}
+    }
 
     /*
     stmt    -> var id : type [:= expr]              {var}
@@ -187,26 +194,65 @@ impl<'a> Parser<'a> {
         let t = self.token_stack.pop();
         if(t.unwrap() != ParseToken::for_loop_begin) {panic!("Unexpected token {:?}", t)}
         let var_id = self.token_stack.pop();
+        //if(var_id.unwrap() != ParseToken::id ) {panic!("Expected variable id")}
+
         let in_word = self.token_stack.pop();
+        let var_id_node = Ast{
+            node_type: var_id.unwrap(),
+            lhs: None,
+            rhs: None,
+            value: var_id.unwrap(), value_type: var_id.unwrap()};
+
 
         let expr1 = self.expression();
         let dots = self.token_stack.pop();
         let expr2 = self.expression();
 
-        while(self.token_stack.last().cloned() != Some(ParseToken::for_loop_end)) {
-            self.for_loop_body();
-        }
-        let do_word = self.token_stack.pop();
+        let in_node = Ast{
+            node_type: ParseToken::for_loop_in,
+            lhs: Some(Box::new(expr1)),
+            rhs: Some(Box::new(expr2)),
+            value: ParseToken::undefined, value_type: ParseToken::undefined};
 
-        panic!("Todo loop");
+
+        let for_node = Ast{ //contains var id,  in <expr> .. <expr>
+            node_type: ParseToken::for_loop_begin,
+            lhs: Some(Box::new(var_id_node)),
+            rhs: Some(Box::new(in_node)),
+            value: ParseToken::undefined, value_type: ParseToken::undefined};
+
+
+        let do_word = self.token_stack.pop();
+        if(do_word != Some(ParseToken::for_loop_do)) {panic!("Unexpected token {:?}", do_word)}
+
+        let statements = self.statements();
+        if self.token_stack.pop() != Some(ParseToken::for_loop_end) {panic!("Unexpected token")}
+        if self.token_stack.pop() != Some(ParseToken::for_loop) {panic!("Unexpected token")}
+
+
+
+        //todo requires better AST node
+        Ast{node_type: ParseToken::for_loop, lhs: None, rhs: None, value: ParseToken::undefined, value_type: ParseToken::undefined}
     }
 
     fn for_loop_body(&mut self) -> Ast<'a> {
-        panic!("Todo loop body parsing")
+
+        let rhs = self.statement();
+        rhs
+
     }
 
     fn for_loop_end(&mut self) -> Ast<'a> {
-        panic!("Todo loop end parsing")
+        let end_word = self.token_stack.pop();
+        if(end_word == Some(ParseToken::for_loop_end)) {
+            panic!("Unexpected word {:?}", end_word)
+        }
+
+        let for_word = self.token_stack.pop();
+        if(for_word == Some(ParseToken::for_loop_end)){
+            panic!("Unexpected word {:?}", for_word)
+        }
+        Ast{node_type: end_word.unwrap(), lhs: None, value_type: ParseToken::undefined, rhs: None, value: ParseToken::undefined}
     }
 
     fn expect(actual: Option<ParseToken<'a>>, expected: Option<ParseToken<'a>>) -> () {
@@ -265,7 +311,7 @@ impl<'a> Parser<'a> {
                 rhs: Some(Box::new(expr_node)),
                 value: ParseToken::undefined,
                 value_type: ParseToken::undefined};
-            println!("parsed expression");
+            println!("parsed assignment node expression");
             assignment_node
         } else {
             var_node
@@ -380,6 +426,25 @@ impl<'a> Parser<'a> {
         ast
     }
 
+    pub fn interpret (&mut self) {
+        println!("{:?}",self.token_stack);
+        let mut t = self.statements();
+        println!("STATEMENTS:\n{:?}", t);
+
+    }
+}
+
+fn reduce_statement_tree<'a,'b>(v: &'b mut Vec<Box<Ast<'a>>>, tree: Box<Ast<'a>>) -> &'b mut Vec<Box<Ast<'a>>>{
+
+    let rhs = tree.lhs.clone();
+
+    if (rhs.is_some()) {
+        reduce_statement_tree(v, rhs.unwrap());
+    }
+
+    let pruned_tree = Ast{node_type: tree.node_type, lhs: tree.lhs.clone(), rhs: None, value: tree.value, value_type: tree.value_type};
+    v.push(Box::new(pruned_tree));
+    v
 }
 
 //let single_char_token = Regex::new(r"\+|-|\*|/|<|=|&|!|\(|\)|;|\.|:").unwrap();

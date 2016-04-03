@@ -124,3 +124,55 @@ fn eval_line(line: &str) {
 	}*/
 	*/
 }
+
+#[test]
+fn sample1_var_definition_expression_print(){
+	let code =r#"
+var X : int := 4 + (6 * 2);
+print X;
+"#;
+	eval_file(code);
+}
+
+#[test]
+fn sample2_loop_print(){
+	let code =r#"
+var nTimes : int := 0;
+print "How many times?";
+read nTimes;
+var x : int;
+for x in 0..nTimes-1 do
+	print x;
+	print " : Hello, World!\n";
+end for;
+assert (x = nTimes);
+"#;
+	eval_file(code);
+}
+
+#[test]
+fn sample3_loop_multiply(){
+	let code =r#"
+print "Give a number";
+var n : int;
+read n;
+var f : int := 1;
+var i : int;
+for i in 1..n do
+	f := f * i;
+end for;
+print "The result is: ";
+print f;
+"#;
+	eval_file(code);
+}
+
+#[test]
+fn sample4_decl_assign_print(){
+	let code =r#"
+var X : int;
+X := 15;
+print X;
+"#;
+	eval_file(code);
+}
