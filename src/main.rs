@@ -92,9 +92,8 @@ fn eval_line(line: &str) {
 	let mut it = TokenIterator::new(line);
 	let all_tokens: Vec<Token> = it.collect();
 
-	for x in all_tokens {
-		println!("{:?}", x);
-	}
+	let mut p = Parser::new(all_tokens);
+	p.interpret();
 
 	/*
 	let mut token_it = all_tokens.into_iter().peekable();
