@@ -4,14 +4,18 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-pub mod token;
-pub mod token_iterator;
+pub mod lexeme;
+pub mod lexeme_iterator;
 pub mod parser;
 pub mod ast;
 
-use token_iterator::TokenIterator;
-use token::Token;
-use parser::Parser;
+use lexeme_iterator::LexemeIterator;
+use lexeme::Lexeme;
+use parser::Token;
+use parser::TokenIterator;
+use ast::AST;
+
+//use parser::Token;
 
 use std::error::Error;
 use std::fs::File;
@@ -24,6 +28,7 @@ use std::env;
 use std::path::PathBuf;
 use std::io;
 use std::collections::HashMap;
+use std::vec::Vec;
 
 
 fn main() {
@@ -44,29 +49,28 @@ fn main() {
 	let exit_keyword = "exit";
 	println!("The file is {}", absolute_path.display());
 	let exitString = "exit".to_string();
-	match (path.exists() && path.is_file()) {
-		true => { //tokenize file
+	match path.exists() && path.is_file() {
+		true => { //lexemeize file
 
 			let f = File::open(path).unwrap();
 			let mut reader = BufReader::new(f);
 
 			let mut buffer = String::new();
 			reader.read_to_string(&mut buffer).unwrap();
-			println!("File contents...");
-			println!("{}", buffer);
-
+			println!("File read");
 			buffer.trim_left_matches("\u{feff}");
 
 			eval_file(&buffer);
 		},
-		false => { //capture input and start tokenizing that
+		false => { //capture input and start lexemeizing that
+			println!("Type commands");
 			println!("Type {:?} to exit", exit_keyword);
 			println!("MiniPL> ");
 			let stdin = io::stdin();
 			for line in stdin.lock().lines() {
 				match line {
 					Ok(content) => {
-						if(content == exit_keyword) {break;}
+						if content == exit_keyword {break;}
 						eval_line(&content);
 					},
 					Err(errmsg) => {println!("Error: {}", errmsg); break},
@@ -77,51 +81,24 @@ fn main() {
 }
 
 fn eval_file(file_contents: &str) {
-	println!("{}\n",file_contents);
 
-	let mut token_it = TokenIterator::new(file_contents);
-	let tokens: Vec<Token> = token_it.collect();
-	let mut p = Parser::new(tokens);
-	p.interpret();
+	let mut lexeme_it = LexemeIterator::new(file_contents);
+	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
+	let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
+	let tokens: Vec<Token> = tokenIterator.collect();
+	let mut ast = AST::new(tokens.as_ref());
+	ast.interpret();
 
 }
 
 fn eval_line(line: &str) {
 	println!("{:?}", line);
-	//let mut variables = HashMap::new();
-	let mut it = TokenIterator::new(line);
-	let all_tokens: Vec<Token> = it.collect();
-
-	let mut p = Parser::new(all_tokens);
-	p.interpret();
-
-	/*
-	let mut token_it = all_tokens.into_iter().peekable();
-	while let Some(token) = token_it.next() {
-		match token {
-			"var" => {
-				let id = token_it.next().unwrap();
-				if(token_it.next().unwrap() != ":") {panic!("Syntax error, expected : after variable id");}
-				let ty = token_it.next().unwrap();
-				let mut val: Option<&str> = None;
-				match token_it.peek() {
-					Some(&":=") => {
-						token_it.next(); //consume assignment token
-						val = token_it.next()
-					}
-					_ => {},
-				}
-				variables.insert(id, (ty, val));
-				println!("{}: {} => {:?}", id, ty, val);
-			},
-			_ => {println!("Unrecognized token:{}", token)}
-		};
-	}
-	/*
-	while let Some(token) = it.next() {	
-		println!("{}",token);
-	}*/
-	*/
+	let it = LexemeIterator::new(line);
+	let mut tokenIterator: TokenIterator = TokenIterator{lexIter:it};
+	let m: Vec<Token> = tokenIterator.collect();
+	println!("tokens:{:?}", m);
+	let mut ast = AST::new(m.as_ref());
+	ast.interpret();
 }
 
 #[test]
