@@ -7,14 +7,12 @@
 pub mod lexeme;
 pub mod lexeme_iterator;
 pub mod parser;
-pub mod ast;
 
 use lexeme_iterator::LexemeIterator;
 use lexeme::Lexeme;
-use parser::Token;
-use parser::TokenIterator;
-use ast::AST;
-
+use parser::token::Token;
+use parser::token_iterator::TokenIterator;
+use parser::interpreter::Interpreter;
 //use parser::Token;
 
 use std::error::Error;
@@ -84,21 +82,29 @@ fn eval_file(file_contents: &str) {
 
 	let mut lexeme_it = LexemeIterator::new(file_contents);
 	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
-	let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
-	let tokens: Vec<Token> = tokenIterator.collect();
-	let mut ast = AST::new(tokens.as_ref());
-	ast.interpret();
+	//let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
+	//let tokens: Vec<Token> = tokenIterator.collect();
+	//let mut ast = AST::new(tokens.as_ref());
+	//ast.interpret();
 
 }
 
 fn eval_line(line: &str) {
 	println!("{:?}", line);
 	let it = LexemeIterator::new(line);
-	let mut tokenIterator: TokenIterator = TokenIterator{lexIter:it};
-	let m: Vec<Token> = tokenIterator.collect();
-	println!("tokens:{:?}", m);
-	let mut ast = AST::new(m.as_ref());
-	ast.interpret();
+
+
+	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:it};
+
+	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+	interpreter.interpret();
+
+
+	//let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+	//let m: Vec<Token> = tokenIterator.collect();
+	//println!("tokens:{:?}", m);
+	//let mut ast = AST::new(m.as_ref());
+	//ast.interpret();
 }
 
 #[test]

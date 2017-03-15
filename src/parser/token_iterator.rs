@@ -1,76 +1,10 @@
 use std::iter::Peekable;
-use std::option::Option;
 
 use lexeme::Lexeme;
 use lexeme::LexemeType;
 use lexeme_iterator::LexemeIterator;
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub enum TokenType {
-    Identifier,
-    IntegerValue(i32),
-    StringLiteral,
-    BooleanValue(bool),
-
-    LParen,
-    RParen,
-    ValueDefinition,
-    TypeDeclaration,
-
-    //keywords and control structures
-    VarKeyword,
-    For,
-    In,
-    Do,
-    Assert,
-    End,
-    Print,
-    Type(ValueType),
-    Write,
-    Read,
-
-    //symbols
-    Addition,
-    Subtraction,
-    Multiplication,
-    Division,
-    LessThan,
-    Equal,
-    Exclamation,
-    And,
-    Stop,
-    StatementEnd,
-
-    RangeDots,
-
-    EOF
-}
-#[derive(Debug, Clone, Copy)]
-pub enum ValueType {
-    String,
-    Integer,
-    Boolean,
-    Any
-}
-
-impl PartialEq for ValueType {
-    fn eq(&self, other: &ValueType) -> bool {
-       true
-    }
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub struct Token<'a> {
-    pub token_type: TokenType,
-    pub lexeme: Lexeme<'a>
-}
-
-
-impl<'a> Default for Token<'a> {
-    fn default() -> Token<'a> {
-        Token{token_type: TokenType::EOF, lexeme: Lexeme::default()}
-    }
-}
+use parser::token::Token;
+use parser::token_type::TokenType;
 
 fn getToken<'a> (lx: Lexeme<'a>) -> Result<Token<'a>, String> {
     match lx {
@@ -115,7 +49,7 @@ fn getKeywordToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         "var" => Ok(Token{lexeme:lx, token_type:TokenType::VarKeyword}),
         "assert" => Ok(Token{lexeme:lx, token_type:TokenType::Assert}),
-        "string" => Ok(Token{lexeme:lx, token_type:TokenType::Type(ValueType::String)}),
+        "string" => Ok(Token{lexeme:lx, token_type:TokenType::StringType}),
         "print" => Ok(Token{lexeme:lx, token_type:TokenType::Print}),
         "read" => Ok(Token{lexeme:lx, token_type:TokenType::Read}),
         "write" => Ok(Token{lexeme:lx, token_type:TokenType::Write}),
@@ -123,8 +57,10 @@ fn getKeywordToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
         "in" => Ok(Token{lexeme:lx, token_type:TokenType::In}),
         "do" => Ok(Token{lexeme:lx, token_type:TokenType::Do}),
         "for" => Ok(Token{lexeme:lx, token_type:TokenType::For}),
-        "int" => Ok(Token{lexeme:lx, token_type:TokenType::Type(ValueType::Integer)}),
-        "bool" => Ok(Token{lexeme:lx, token_type:TokenType::Type(ValueType::Boolean)}),
+        "int" => Ok(Token{lexeme:lx, token_type:TokenType::IntegerType}),
+        "bool" => Ok(Token{lexeme:lx, token_type:TokenType::BooleanType}),
+        "true" => Ok(Token{lexeme:lx, token_type:TokenType::BooleanValue(true)}),
+        "false" => Ok(Token{lexeme:lx, token_type:TokenType::BooleanValue(false)}),
         _ => Err(format!("Invalid token:{:?}", lx))
     }
 }
@@ -148,6 +84,7 @@ fn getSingleCharToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
     }
 }
 
+
 pub fn parseStatements<'a>(lexemes: &mut Peekable<LexemeIterator<'a>>) -> Result<Vec<Token<'a>>, String> {
     let items: Result<Vec<Token<'a>>, String> = lexemes.map(getToken).collect();
     items
@@ -161,17 +98,15 @@ pub fn parseStatement(lexemes: &mut Peekable<LexemeIterator>) -> bool {
 }
 
 #[derive(Clone)]
-pub struct TokenIterator<'a> {
-    pub lexIter: LexemeIterator<'a>
+pub struct TokenIterator<'a, I> where I : Iterator<Item=Lexeme<'a>>  {
+    pub lexIter: I
 }
 
-impl<'a> Iterator for TokenIterator<'a> {
+impl<'a, I> Iterator for TokenIterator<'a, I> where I: Iterator<Item=Lexeme<'a>> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Token<'a>> {
         let maybeLexeme = self.lexIter.next();
-        println!("{:?}", maybeLexeme);
-
         match maybeLexeme {
             Some(lexeme) => {
                 let x = getToken(lexeme);
@@ -182,7 +117,5 @@ impl<'a> Iterator for TokenIterator<'a> {
             },
             None    => None
         }
-
-
     }
 }

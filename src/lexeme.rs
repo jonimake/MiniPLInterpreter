@@ -8,6 +8,17 @@ pub struct Lexeme<'a> {
     pub column: usize
 }
 
+impl<'a> Lexeme<'a> {
+    pub fn new(s: &'a str) -> Lexeme<'a> {
+        Lexeme {
+            lexeme_type: LexemeType::default(),
+            lexeme: s,
+            line: 0,
+            column: 0
+        }
+    }
+}
+
 impl<'a> fmt::Display for Lexeme<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\t ({}:{})\t [{:?}]", self.lexeme, self.line, self.column, self.lexeme_type)
