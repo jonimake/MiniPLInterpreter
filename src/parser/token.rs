@@ -1,7 +1,10 @@
 use lexeme::Lexeme;
 use parser::token_type::TokenType;
 
+use std::fmt;
+
 #[derive(PartialEq, Debug, Clone, Copy)]
+//#[derive(PartialEq, Debug, Clone)]
 pub struct Token<'a> {
     pub token_type: TokenType,
     pub lexeme: Lexeme<'a>
@@ -29,5 +32,11 @@ impl<'a> Token<'a> {
 impl<'a> Default for Token<'a> {
     fn default() -> Token<'a> {
         Token{token_type: TokenType::EOF, lexeme: Lexeme::default()}
+    }
+}
+
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.token_type)
     }
 }

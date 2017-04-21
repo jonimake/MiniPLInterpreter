@@ -96,8 +96,10 @@ fn eval_line(line: &str) {
 
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:it};
 
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
-	interpreter.interpret();
+
+		//let mut interpreter = Interpreter::new(tokenIterator);
+		let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+		interpreter.interpret();
 
 
 	//let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);

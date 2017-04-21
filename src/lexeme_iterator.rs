@@ -10,9 +10,9 @@ use std::str::CharIndices;
 use lexeme::Lexeme;
 use lexeme::LexemeType;
 
-const single_char_lexeme: &'static [&'static str] = &["+","-","*","/","<","=","&","!","(",")",";",".",":"];
-const two_char_lexeme: &'static [&'static str] = &["..",":="];
-const keyword: &'static [&'static str] = &["assert","string","print","bool","read","var","for","end","int","in","do"];
+const SINGLE_CHAR_LEXEME: &'static [&'static str] = &["+","-","*","/","<","=","&","!","(",")",";",".",":"];
+const TWO_CHAR_LEXEME: &'static [&'static str] = &["..",":="];
+const KEYWORD: &'static [&'static str] = &["assert","string","print","bool","read","var","for","end","int","in","do"];
 
 //#[derive(Clone)]
 pub struct LexemeIterator<'a>  {
@@ -162,7 +162,6 @@ impl<'a> Iterator for LexemeIterator<'a> {
 		let mut skipped_initial_whitespace = false;
 		let mut skipping_whitespace = false;
 		let mut lexeme_start_on_line = 0;
-		let mut t_start = usize::MAX;
 		let mut t_end = usize::MIN;
 		let mut lexeme_type = LexemeType::NA;
 		let mut longest_lexeme = usize::MIN;
@@ -190,11 +189,10 @@ impl<'a> Iterator for LexemeIterator<'a> {
 					let line_pos_end = self.current_line_char_pos + lexeme_candidate.len();
 					let lexeme_length = lexeme_candidate.chars().count();
 					if(lexeme_length > longest_lexeme) { //prioritize length
-
 						//println!("New longest lexeme {:?}, {:?}, {:?}", lexeme_candidate ,lexemetype, lexeme_length);
 						longest_lexeme = lexeme_length;
 						lexemeStr = lexeme_candidate;
-						t_start = line_pos_start;
+
 						t_end = column;
 						lexeme_start_on_line = line_pos_start;
 						lexeme_type = lexemetype;
@@ -221,11 +219,11 @@ impl<'a> Iterator for LexemeIterator<'a> {
 	}
 }
 
-fn is_single_char_lexeme(lexeme: &str) -> bool {single_char_lexeme.iter().any(|&x| x == lexeme)}
+fn is_single_char_lexeme(lexeme: &str) -> bool { SINGLE_CHAR_LEXEME.iter().any(|&x| x == lexeme)}
 
-fn is_two_char_lexeme(lexeme: &str) -> bool {two_char_lexeme.iter().any(|&x| x == lexeme)}
+fn is_two_char_lexeme(lexeme: &str) -> bool { TWO_CHAR_LEXEME.iter().any(|&x| x == lexeme)}
 
-fn is_keyword_lexeme(lexeme: &str) -> bool {	keyword.iter().any(|&x| x == lexeme)}
+fn is_keyword_lexeme(lexeme: &str) -> bool {	KEYWORD.iter().any(|&x| x == lexeme)}
 
 fn is_string_literal(lexeme: &str) -> bool {
 	let starts_with_quote = lexeme.starts_with("\"");
