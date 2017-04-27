@@ -87,7 +87,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
 
     fn idAssign(&mut self) {
         let id = self.expectNext(TokenType::Identifier);
-        self.expectNext(TokenType::ValueDefinition);
+        self.expectPeek(TokenType::ValueDefinition);
         self.assign(id);
     }
 
@@ -120,13 +120,13 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             let tt: TokenType = token.token_type;
             match tt {
                 TokenType::Identifier => {
-                    debug!("print variable: {:?}", self.getVariableValue(token.clone()));
+                    info!("print variable: {:?}", self.getVariableValue(token.clone()));
                 }
                 TokenType::StringLiteral => {
-                    debug!("print literal: {:?}", tt);
+                    info!("print literal: {:?}", tt);
                 }
                 TokenType::IntegerValue(x)=> {
-                    debug!("print integer: {:?}", x);
+                    info!("print integer: {:?}", x);
                 }
                 _ => unimplemented!()
             }
@@ -220,6 +220,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     fn expectNext(&mut self, tt: TokenType) -> Token<'b> {
         let maybetoken = self.iterator.next();
         if let Some(token) = maybetoken {
+            trace!("expectNext {:?}, actual {:?}", tt.clone(), token.clone());
             if token.token_type == tt {
                 return token;
             } else {
@@ -699,4 +700,43 @@ fn test_precedence() {
     assert!(precedenceEqualOrLessThan(TokenType::Addition, TokenType::Division));
     assert!(!precedenceEqualOrLessThan(TokenType::Multiplication, TokenType::Addition));
     assert!(!precedenceEqualOrLessThan(TokenType::Division, TokenType::Subtraction));
+}
+
+#[test]
+fn stateful_var_definition() {
+    //let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Trace, simplelog::Config::default());
+    let lexeme = Lexeme::default();
+    let val = Token::newString(TokenType::IntegerValue(1), "1");
+
+    let tokens1: Vec<Token> = vec![
+        Token::newString(TokenType::VarKeyword, "var"),
+        Token::newString(TokenType::Identifier, "x"),
+        Token::newString(TokenType::TypeDeclaration, ":"),
+        Token::newString(TokenType::IntegerType, "int"),
+        Token::newString(TokenType::StatementEnd, ";"),
+    ];
+
+    let tokens2: Vec<Token> = vec![
+        Token::newString(TokenType::Identifier, "x"),
+        Token::newString(TokenType::ValueDefinition, ":="),
+        val,
+        Token::newString(TokenType::StatementEnd, ";"),
+    ];
+
+
+    let mut state = HashMap::new();
+    {
+        let mut iter = tokens1.into_iter();
+        let mut int = Interpreter::new(&mut iter, &mut state);
+        int.interpret();
+    }
+    {
+        let mut iter = tokens2.into_iter();
+        let mut int2 = Interpreter::new(&mut iter, &mut state);
+        int2.interpret();
+    }
+
+
+    assert!(state.contains_key("x"));
+    assert_eq!(state.get("x"), Some(&val));
 }
