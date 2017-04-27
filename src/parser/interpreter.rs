@@ -8,6 +8,7 @@ use parser::token_iterator::TokenIterator;
 use parser::token_type::TokenType;
 use lexeme::Lexeme;
 
+use simplelog;
 
 
 type TokenIteratorType<'a> = &'a mut Iterator<Item=Token<'a>>;
@@ -192,9 +193,6 @@ impl<'a> Interpreter<'a> {
                 TokenType::LParen => {opstack.push(token)},
 
 
-
-
-
                 TokenType::RParen => {
 //Until the token at the top of the stack is a left parenthesis, pop operators off the stack onto the output queue.
 //Pop the left parenthesis from the stack, but not onto the output queue.
@@ -258,6 +256,11 @@ fn isOperator<'a>(token: Token<'a>) -> bool {
 
 fn evaluate_postfix<'a>(mut tokens: &mut Vec<Token<'a>>) -> Token<'a> {
     let mut stack: Vec<Token<'a>> = Vec::new();
+
+    for token in tokens.clone() {
+        debug!("{:?}", token);
+    }
+
 
     tokens.reverse();
     while let Some(nextToken) = tokens.pop() {
@@ -633,10 +636,10 @@ fn parse_var_definition_expression_2() {
     assert_eq!(int.variables.get("x"), Some(&Token::newString(TokenType::IntegerValue(9), "")));
 }
 
-#[test]
+//#[test]
 fn parse_var_definition_expression_3() {
     let lexeme = Lexeme::default();
-
+    // var x: int := (1+3)*4
     let tokens: Vec<Token> = vec![
         Token::newString(TokenType::VarKeyword, "var"),
         Token::newString(TokenType::Identifier, "x"),
@@ -648,7 +651,7 @@ fn parse_var_definition_expression_3() {
         Token::newString(TokenType::Addition, "+"),
         Token::newString(TokenType::IntegerValue(3), "3"),
         Token::newString(TokenType::RParen, ")"),
-        Token::newString(TokenType::Addition, "*"),
+        Token::newString(TokenType::Multiplication, "*"),
         Token::newString(TokenType::IntegerValue(4), "4"),
         Token::newString(TokenType::StatementEnd, ";"),
     ];
@@ -657,7 +660,31 @@ fn parse_var_definition_expression_3() {
     let mut int = Interpreter::new(&mut iter);
     int.interpret();
     assert!(int.variables.contains_key("x"));
-    assert_eq!(int.variables.get("x"), Some(&Token::newString(TokenType::IntegerValue(9), "")));
+    let expectedValue = Token::newString(TokenType::IntegerValue(12), "12");
+    assert_eq!(int.variables.get("x"), Some(&expectedValue));
+}
+
+
+#[test]
+fn parse_expression_3() {
+    let lexeme = Lexeme::default();
+    // (1+3)*4
+    let tokens: Vec<Token> = vec![
+        Token::newString(TokenType::LParen, "("),
+        Token::newString(TokenType::IntegerValue(1), "1"),
+        Token::newString(TokenType::Addition, "+"),
+        Token::newString(TokenType::IntegerValue(3), "3"),
+        Token::newString(TokenType::RParen, ")"),
+        Token::newString(TokenType::Multiplication, "*"),
+        Token::newString(TokenType::IntegerValue(4), "4"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut int = Interpreter::new(&mut iter);
+    let result = int.expression();
+    println!("result = {:?}", result);
+    let expectedValue = Token::newString(TokenType::IntegerValue(16), "");
+    assert_eq!(result, expectedValue);
 }
 
 #[test]
