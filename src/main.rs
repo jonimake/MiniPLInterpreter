@@ -33,7 +33,6 @@ use std::collections::HashMap;
 use std::vec::Vec;
 
 
-
 static HAS_INIT: bool = false;
 
 fn main() {
@@ -67,7 +66,7 @@ fn main() {
 	path = Path::new(pathStr);
 
 	let mut absolute_path = env::current_dir().unwrap();
-	
+	let mut state: HashMap<String, Token> = HashMap::new();
 
 	debug!("The current directory is {}", absolute_path.display());
 	absolute_path.push(path);
@@ -96,7 +95,7 @@ fn main() {
 				match line {
 					Ok(content) => {
 						if content == exit_keyword {break;}
-						eval_line(&content);
+						eval_line(&content, &mut state);
 					},
 					Err(errmsg) => {error!("Error: {}", errmsg); break},
 				}
@@ -106,10 +105,11 @@ fn main() {
 }
 
 fn eval_file(file_contents: &str) {
-
+	let mut state = HashMap::new();
 	let mut lexeme_it = LexemeIterator::new(file_contents);
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:lexeme_it};
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
+	//let mut interpreter = Interpreter::new(&mut state);
 	interpreter.interpret();
 	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
 	//let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
@@ -119,7 +119,7 @@ fn eval_file(file_contents: &str) {
 
 }
 
-fn eval_line(line: &str) {
+fn eval_line(line: &str, state: &mut HashMap<String, Token>) {
 	info!("{:?}", line);
 	let it = LexemeIterator::new(line);
 
@@ -127,7 +127,9 @@ fn eval_line(line: &str) {
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:it};
 
 	//let mut interpreter = Interpreter::new(tokenIterator);
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+	let mut state = HashMap::new();
+	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
+	//let mut interpreter = Interpreter::new(&mut state);
 	interpreter.interpret();
 
 
