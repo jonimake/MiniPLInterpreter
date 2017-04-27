@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Joni Mäkelä <joni.makela@gmail.com>"]
 
 [dependencies]
+log = "0.3.7"
+simplelog = "0.4.2"
