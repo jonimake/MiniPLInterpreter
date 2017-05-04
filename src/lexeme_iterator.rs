@@ -147,9 +147,9 @@ impl<'a>  LexemeIterator<'a>  {
 }
 
 impl<'a> Iterator for LexemeIterator<'a> {
-	type Item = Lexeme<'a>;
+	type Item = Lexeme;
 
-	fn next(&mut self) -> Option<Lexeme<'a>> {
+	fn next(&mut self) -> Option<Lexeme> {
 		let mut lexeme: Option<Lexeme> = None;
 
 		if !self.handle_end_of_line() {
@@ -206,7 +206,7 @@ impl<'a> Iterator for LexemeIterator<'a> {
 			lexeme = Some(Lexeme{
 				line: self.current_line_number + 1,
 				column: lexeme_start_on_line + 1,
-				lexeme: lexemeStr,
+				lexeme: lexemeStr.to_string(),
 				lexeme_type: lexeme_type});
 
 			//set next slice start on line
@@ -299,15 +299,15 @@ fn lexemeize_integer_assignment() -> () {
 	let code = r#"var x : int :=4-2;"#;
 	println!("{}", code);
 	let mut iterator = LexemeIterator::new(code);
-	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "x", lexeme_type: LexemeType::identifier}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: ":", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 9, lexeme: "int", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 13, lexeme: ":=", lexeme_type: LexemeType::two_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 15, lexeme: "4", lexeme_type: LexemeType::integer}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 16, lexeme: "-", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 17, lexeme: "2", lexeme_type: LexemeType::integer}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 18, lexeme: ";", lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "x".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: ":".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 9, lexeme: "int".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 13, lexeme: ":=".to_string(), lexeme_type: LexemeType::two_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 15, lexeme: "4".to_string(), lexeme_type: LexemeType::integer}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 16, lexeme: "-".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 17, lexeme: "2".to_string(), lexeme_type: LexemeType::integer}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 18, lexeme: ";".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
 }
 
 #[test]
@@ -315,8 +315,8 @@ fn lexemeize_two_consecutive() -> () {
 	let code = include_str!("../sample4.txt");
 	println!("{}", code);
 	let mut iterator = LexemeIterator::new(code);
-	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "X", lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "X".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
 }
 
 #[test]
@@ -324,11 +324,11 @@ fn lexemeize_two_consecutive_file_3() -> () {
 	let code = include_str!("../sample3.txt");
 	println!("{}", code);
 	let mut iterator = LexemeIterator::new(code);
-	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "print", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: "\"Give a number\"", lexeme_type: LexemeType::string_literal}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 22, lexeme: ";", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:2, column: 1, lexeme: "var", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:2, column: 5, lexeme: "n", lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "print".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: "\"Give a number\"".to_string(), lexeme_type: LexemeType::string_literal}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 22, lexeme: ";".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 1, lexeme: "var".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 5, lexeme: "n".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
 }
 
 #[test]
@@ -336,11 +336,11 @@ fn lexemeize_full_line() -> () {
 	let code = include_str!("../sample4.txt");
 	println!("{}", code);
 	let mut iterator = LexemeIterator::new(code);
-	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "X", lexeme_type: LexemeType::identifier}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: ":", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 9, lexeme: "int", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 12, lexeme: ";", lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "var".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 5, lexeme: "X".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 7, lexeme: ":".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 9, lexeme: "int".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 12, lexeme: ";".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
 }
 
 #[test]
@@ -353,13 +353,13 @@ fn lexemeize_multiple_lines() -> () {
 	iterator.next();
 	iterator.next();
 	iterator.next();
-	assert_eq!(Some(Lexeme{line:2, column: 1, lexeme: "X", lexeme_type: LexemeType::identifier}),iterator.next());
-	assert_eq!(Some(Lexeme{line:2, column: 3, lexeme: ":=", lexeme_type: LexemeType::two_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:2, column: 6, lexeme: "15", lexeme_type: LexemeType::integer}),iterator.next());
-	assert_eq!(Some(Lexeme{line:2, column: 8, lexeme: ";", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:3, column: 1, lexeme: "print", lexeme_type: LexemeType::keyword}),iterator.next());
-	assert_eq!(Some(Lexeme{line:3, column: 7, lexeme: "X", lexeme_type: LexemeType::identifier}),iterator.next());
-	assert_eq!(Some(Lexeme{line:3, column: 8, lexeme: ";", lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 1, lexeme: "X".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 3, lexeme: ":=".to_string(), lexeme_type: LexemeType::two_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 6, lexeme: "15".to_string(), lexeme_type: LexemeType::integer}),iterator.next());
+	assert_eq!(Some(Lexeme{line:2, column: 8, lexeme: ";".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:3, column: 1, lexeme: "print".to_string(), lexeme_type: LexemeType::keyword}),iterator.next());
+	assert_eq!(Some(Lexeme{line:3, column: 7, lexeme: "X".to_string(), lexeme_type: LexemeType::identifier}),iterator.next());
+	assert_eq!(Some(Lexeme{line:3, column: 8, lexeme: ";".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
 }
 
 #[test]
@@ -367,7 +367,7 @@ fn recorgnize_expression() -> () {
 	let code = "1+1";
 	println!("{}", code);
 	let mut iterator = LexemeIterator::new(code);
-	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "1", lexeme_type: LexemeType::integer}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 2, lexeme: "+", lexeme_type: LexemeType::single_char}),iterator.next());
-	assert_eq!(Some(Lexeme{line:1, column: 3, lexeme: "1", lexeme_type: LexemeType::integer}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 1, lexeme: "1".to_string(), lexeme_type: LexemeType::integer}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 2, lexeme: "+".to_string(), lexeme_type: LexemeType::single_char}),iterator.next());
+	assert_eq!(Some(Lexeme{line:1, column: 3, lexeme: "1".to_string(), lexeme_type: LexemeType::integer}),iterator.next());
 }

@@ -6,7 +6,7 @@ use lexeme_iterator::LexemeIterator;
 use parser::token::Token;
 use parser::token_type::TokenType;
 
-fn getToken<'a> (lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getToken<'a> (lx: Lexeme) -> Result<Token, String> {
     match lx {
         Lexeme{lexeme_type: LexemeType::single_char,..} => getSingleCharToken(lx),
         Lexeme{lexeme_type: LexemeType::two_char,..} => getTwoCharToken(lx),
@@ -19,24 +19,23 @@ fn getToken<'a> (lx: Lexeme<'a>) -> Result<Token<'a>, String> {
 }
 
 
-fn getStringLiteralToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getStringLiteralToken<'a>(lx: Lexeme) -> Result<Token, String> {
     Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral})
 }
 
-fn getIdentifierToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getIdentifierToken<'a>(lx: Lexeme) -> Result<Token, String> {
     Ok(Token{lexeme:lx, token_type:TokenType::Identifier})
 }
 
-fn getIntegerToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getIntegerToken<'a>(lx: Lexeme) -> Result<Token, String> {
     if let Ok(value) = lx.lexeme.parse::<i32>() {
         Ok(Token{lexeme:lx, token_type:TokenType::IntegerValue(value)})
     } else {
         Err(format!("Invalid token:{:?}", lx))
     }
-
 }
 
-fn getTwoCharToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getTwoCharToken<'a>(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         ".." => Ok(Token{lexeme:lx, token_type:TokenType::RangeDots}),
         ":=" => Ok(Token{lexeme:lx, token_type:TokenType::ValueDefinition}),
@@ -44,8 +43,7 @@ fn getTwoCharToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
     }
 }
 
-
-fn getKeywordToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getKeywordToken<'a>(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         "var" => Ok(Token{lexeme:lx, token_type:TokenType::VarKeyword}),
         "assert" => Ok(Token{lexeme:lx, token_type:TokenType::Assert}),
@@ -65,7 +63,7 @@ fn getKeywordToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
     }
 }
 
-fn getSingleCharToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
+fn getSingleCharToken<'a>(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         "(" => Ok(Token{lexeme:lx, token_type:TokenType::LParen}),
         ")" => Ok(Token{lexeme:lx, token_type:TokenType::RParen}),
@@ -85,8 +83,8 @@ fn getSingleCharToken<'a>(lx: Lexeme<'a>) -> Result<Token<'a>, String> {
 }
 
 
-pub fn parseStatements<'a>(lexemes: &mut Peekable<LexemeIterator<'a>>) -> Result<Vec<Token<'a>>, String> {
-    let items: Result<Vec<Token<'a>>, String> = lexemes.map(getToken).collect();
+pub fn parseStatements<'a>(lexemes: &mut Peekable<LexemeIterator<'a>>) -> Result<Vec<Token>, String> {
+    let items: Result<Vec<Token>, String> = lexemes.map(getToken).collect();
     items
 }
 
@@ -98,14 +96,14 @@ pub fn parseStatement(lexemes: &mut Peekable<LexemeIterator>) -> bool {
 }
 
 #[derive(Clone)]
-pub struct TokenIterator<'a, I> where I : Iterator<Item=Lexeme<'a>>  {
+pub struct TokenIterator<I> where I : Iterator<Item=Lexeme>  {
     pub lexIter: I
 }
 
-impl<'a, I> Iterator for TokenIterator<'a, I> where I: Iterator<Item=Lexeme<'a>> {
-    type Item = Token<'a>;
+impl<'a, I> Iterator for TokenIterator<I> where I: Iterator<Item=Lexeme> {
+    type Item = Token;
 
-    fn next(&mut self) -> Option<Token<'a>> {
+    fn next(&mut self) -> Option<Token> {
         let maybeLexeme = self.lexIter.next();
         match maybeLexeme {
             Some(lexeme) => {

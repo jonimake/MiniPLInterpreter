@@ -11,15 +11,15 @@ use lexeme::Lexeme;
 use simplelog;
 
 
-type TokenIteratorType<'a,'b : 'a> = &'a mut Iterator<Item=Token<'b>>;
+type TokenIteratorType<'a> = &'a mut Iterator<Item=Token>;
 
-pub struct Interpreter<'a, 'b: 'a>  {
-    pub variables: &'a mut HashMap<String, Token<'b>>,
-    iterator: Peekable<TokenIteratorType<'a,'b>>
+pub struct Interpreter<'a>  {
+    pub variables: &'a mut HashMap<String, Token>,
+    iterator: Peekable<TokenIteratorType<'a>>
 }
 
-impl<'a, 'b: 'a> Interpreter<'a, 'b> {
-    pub fn new(iter: TokenIteratorType<'a, 'b>, state: &'a mut HashMap<String, Token<'b>>) -> Interpreter<'a, 'b> {
+impl<'a> Interpreter<'a> {
+    pub fn new(iter: TokenIteratorType<'a>, state: &'a mut HashMap<String, Token>) -> Interpreter<'a> {
         Interpreter {
             variables: state,
             iterator: iter.peekable()
@@ -35,8 +35,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
 
 /*
     pub fn default()-> Interpreter<'a>  {
-        let empty:Vec<Token<'b>> =vec![];
-        let iter: IntoIter<Token<'b>> = empty.into_iter();
+        let empty:Vec<Token> =vec![];
+        let iter: IntoIter<Token> = empty.into_iter();
         let asd: &mut Iterator<Item=Token> = &mut iter;
         Interpreter {
             variables: HashMap::new(),
@@ -74,12 +74,12 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         }
     }
 
-    fn setVariableValue(&mut self, name: Token<'b>, token: Token<'b>) {
+    fn setVariableValue(&mut self, name: Token, token: Token) {
         debug!("{:?} => {:?}", name.lexeme.lexeme, token);
         self.variables.insert(name.lexeme.lexeme.to_string(), token);
     }
 
-    fn getVariableValue(&mut self, name: Token<'b>) -> Option<&Token<'b>> {
+    fn getVariableValue(&mut self, name: Token) -> Option<&Token> {
         debug!("get {:?}", name);
         let name: String = name.lexeme.lexeme.to_string();
         self.variables.get(&name)
@@ -97,16 +97,16 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         let id: Token = self.expectNext(TokenType::Identifier);
         let typeassign: Token = self.expectNext(TokenType::TypeDeclaration);
         let tokentype = self.iterator.next().unwrap();
-        self.setVariableValue(id, tokentype);
+        self.setVariableValue(id.clone(), tokentype);
         if self.expectPeek(TokenType::ValueDefinition) {
             debug!("has value def");
             self.assign(id);
         }
     }
 
-    fn assign(&mut self, id: Token<'b>) {
+    fn assign(&mut self, id: Token) {
         self.expectNext(TokenType::ValueDefinition);
-        let expressionValue: Token<'b> = self.expression();
+        let expressionValue: Token = self.expression();
         debug!("Expression value: {:?}", expressionValue);
         self.setVariableValue(id, expressionValue);
     }
@@ -133,9 +133,9 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         }
 
     }
-    fn expression(&mut self) -> Token<'b> {
+    fn expression(&mut self) -> Token {
 
-        let mut all_tokens: Vec<Token<'b>> = Vec::new();
+        let mut all_tokens: Vec<Token> = Vec::new();
         loop {
             let token = self.iterator.peek().cloned().unwrap_or(Token::new(TokenType::StatementEnd, Lexeme::default()));
             if token.token_type == TokenType::StatementEnd {break;}
@@ -147,8 +147,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         debug!("after take while {:?}", self.iterator.peek().cloned());
         debug!("after take while all tokens: {:?}", all_tokens);
 
-        let mut output: Vec<Token<'b>> = Vec::new();
-        let mut opstack: Vec<Token<'b>> = Vec::new();
+        let mut output: Vec<Token> = Vec::new();
+        let mut opstack: Vec<Token> = Vec::new();
 
         let mut counter: i32 = 0;
         for token in all_tokens {
@@ -173,7 +173,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                 */
                     while let Some(y) = opstack.last().cloned() {
                         counter = counter+1;
-                        if isOperator(y) && precedenceEqualOrLessThan(token_type,y.token_type) {
+                        if isOperator(&y) && precedenceEqualOrLessThan(token_type,y.token_type) {
                             output.push(opstack.pop().unwrap());
                         }
                         else {
@@ -217,7 +217,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         return evaluate_postfix(&mut output);
     }
 
-    fn expectNext(&mut self, tt: TokenType) -> Token<'b> {
+    fn expectNext(&mut self, tt: TokenType) -> Token {
         let maybetoken = self.iterator.next();
         if let Some(token) = maybetoken {
             trace!("expectNext {:?}, actual {:?}", tt.clone(), token.clone());
@@ -239,7 +239,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     }
 }
 
-fn isOperator(token: Token) -> bool {
+fn isOperator(token: &Token) -> bool {
     let token_type = token.token_type;
     match token_type {
         TokenType::Addition
@@ -251,7 +251,7 @@ fn isOperator(token: Token) -> bool {
     }
 }
 
-fn evaluate_postfix<'a, 'b: 'a>(mut tokens: &'a mut Vec<Token<'b>>) -> Token<'b> {
+fn evaluate_postfix<'a, 'b: 'a>(mut tokens: &'a mut Vec<Token>) -> Token {
     let mut stack: Vec<Token> = Vec::new();
 
     for token in tokens.clone() {
@@ -259,7 +259,7 @@ fn evaluate_postfix<'a, 'b: 'a>(mut tokens: &'a mut Vec<Token<'b>>) -> Token<'b>
     }
     tokens.reverse();
     while let Some(nextToken) = tokens.pop() {
-        if isOperator(nextToken) {
+        if isOperator(&nextToken) {
             //debug!("eval next token {:?}", nextToken.token_type);
             let operator_token_type = nextToken.token_type;
             if operator_token_type == TokenType::Exclamation {
@@ -288,11 +288,11 @@ fn evaluate_postfix<'a, 'b: 'a>(mut tokens: &'a mut Vec<Token<'b>>) -> Token<'b>
     if stack.len() != 1 {
         panic!("Stack length wasn't 1, error occurred");
     } else {
-        return stack[0];
+        return stack[0].clone();
     }
 }
 
-fn binary_integer_op<'a>(a: i32, b: i32, op: TokenType) -> Token<'a>{
+fn binary_integer_op(a: i32, b: i32, op: TokenType) -> Token{
     let tt = match op {
         TokenType::Addition => TokenType::IntegerValue(a+b),
         TokenType::Subtraction => TokenType::IntegerValue(a-b),
@@ -306,10 +306,10 @@ fn binary_integer_op<'a>(a: i32, b: i32, op: TokenType) -> Token<'a>{
     Token::new(tt, Lexeme::default())
 }
 
-fn operation<'a>(left: Token<'a>, op: Token<'a>, right: Token<'a>) -> Token<'a> {
+fn operation(left: Token, op: Token, right: Token) -> Token {
     let types = (left.token_type, right.token_type);
 
-    let result: Token<'a> = match op.token_type {
+    let result: Token = match op.token_type {
         TokenType::Addition =>
             match types {
                 (TokenType::IntegerValue(leftVal), TokenType::IntegerValue(rightVal)) => {
@@ -356,10 +356,10 @@ fn precedenceEqualOrLessThan(x: TokenType, y: TokenType) -> bool {
     }
 }
 
-fn RPN<'a>(all_tokens: Vec<Token<'a>>) -> Vec<Token<'a>>{
+fn RPN(all_tokens: Vec<Token>) -> Vec<Token>{
 
-    let mut output: Vec<Token<'a>> = Vec::new();
-    let mut stack: Vec<Token<'a>> = Vec::new();
+    let mut output: Vec<Token> = Vec::new();
+    let mut stack: Vec<Token> = Vec::new();
     for token in all_tokens {
         let token_type = token.token_type;
         match token_type {
@@ -370,7 +370,7 @@ fn RPN<'a>(all_tokens: Vec<Token<'a>>) -> Vec<Token<'a>>{
             | TokenType::Exclamation //negation
             => {
                 while let Some(y) = stack.first().cloned() {
-                    if isOperator(y) && precedenceEqualOrLessThan(token_type,y.token_type) {
+                    if isOperator(&y) && precedenceEqualOrLessThan(token_type,y.token_type) {
                         output.push(stack.pop().unwrap());
                     }
                 }
@@ -421,7 +421,7 @@ fn evaluate_postfix_simple_addition() {
 fn evaluate_postfix_complex() {
     //5 1 2 + 4 * + 3 −
     let mut tokens: Vec<Token> = vec![
-        
+
         Token::newString(TokenType::IntegerValue(5), "5"),
         Token::newString(TokenType::IntegerValue(1), "1"),
         Token::newString(TokenType::IntegerValue(2), "2"),
@@ -447,7 +447,7 @@ fn parse_var_definition() {
         Token::newString(TokenType::TypeDeclaration, ":"),
         Token::newString(TokenType::IntegerType, "int"),
         Token::newString(TokenType::ValueDefinition, ":="),
-        val,
+        val.clone(),
         Token::newString(TokenType::StatementEnd, ";"),
     ];
 
@@ -468,7 +468,7 @@ fn parse_var_declaration() {
         Token::newString(TokenType::VarKeyword, "var"),
         Token::newString(TokenType::Identifier, "x"),
         Token::newString(TokenType::TypeDeclaration, ":"),
-        tokentype,
+        tokentype.clone(),
         Token::newString(TokenType::StatementEnd, ";"),
     ];
 
@@ -530,7 +530,7 @@ fn parse_print_complicated() {
         val,
         Token::newString(TokenType::StatementEnd, ";"),
         Token::newString(TokenType::Print, "print"),
-        id,
+        id.clone(),
         Token::newString(TokenType::StatementEnd, ";"),
 
     ];
@@ -607,11 +607,11 @@ fn parse_var_definition_expression_1() {
 
 #[test]
 fn is_operator_test() {
-    assert!(isOperator(Token::newString(TokenType::Addition, "+")));
-    assert!(isOperator(Token::newString(TokenType::Addition, "*")));
-    assert!(isOperator(Token::newString(TokenType::Addition, "-")));
-    assert!(isOperator(Token::newString(TokenType::Addition, "/")));
-    assert!(isOperator(Token::newString(TokenType::Exclamation, "!")));
+    assert!(isOperator(&Token::newString(TokenType::Addition, "+")));
+    assert!(isOperator(&Token::newString(TokenType::Addition, "*")));
+    assert!(isOperator(&Token::newString(TokenType::Addition, "-")));
+    assert!(isOperator(&Token::newString(TokenType::Addition, "/")));
+    assert!(isOperator(&Token::newString(TokenType::Exclamation, "!")));
 }
 
 #[test]
@@ -738,5 +738,5 @@ fn stateful_var_definition() {
 
 
     assert!(state.contains_key("x"));
-    assert_eq!(state.get("x"), Some(&val));
+    assert_eq!(state.get("x"), Some(&Token::newString(TokenType::IntegerValue(1), "1")));
 }

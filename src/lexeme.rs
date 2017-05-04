@@ -1,25 +1,25 @@
 use std::fmt;
 
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub struct Lexeme<'a> {
+#[derive(PartialEq, Debug, Clone)]
+pub struct Lexeme {
     pub lexeme_type: LexemeType,
-    pub lexeme: &'a str,
+    pub lexeme: String,
     pub line: usize,
     pub column: usize
 }
 
-impl<'a> Lexeme<'a> {
-    pub fn new(s: &'a str) -> Lexeme<'a> {
+impl Lexeme {
+    pub fn new(s: &str) -> Lexeme {
         Lexeme {
             lexeme_type: LexemeType::default(),
-            lexeme: s,
+            lexeme: s.to_owned(),
             line: 0,
             column: 0
         }
     }
 }
 
-impl<'a> fmt::Display for Lexeme<'a> {
+impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\t ({}:{})\t [{:?}]", self.lexeme, self.line, self.column, self.lexeme_type)
     }
@@ -36,9 +36,9 @@ pub enum LexemeType {
     NA
 }
 
-impl<'a> Default for Lexeme<'a> {
-    fn default() -> Lexeme<'a> {
-        Lexeme{column: 0, line: 0,lexeme:"",lexeme_type:LexemeType::default()}
+impl Default for Lexeme {
+    fn default() -> Lexeme {
+        Lexeme{column: 0, line: 0,lexeme:"".to_owned(),lexeme_type:LexemeType::default()}
     }
 }
 
