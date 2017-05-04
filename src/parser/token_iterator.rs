@@ -20,7 +20,7 @@ fn getToken (lx: Lexeme) -> Result<Token, String> {
 
 
 fn getStringLiteralToken(lx: Lexeme) -> Result<Token, String> {
-    Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral})
+    Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral(0)})
 }
 
 fn getIdentifierToken(lx: Lexeme) -> Result<Token, String> {

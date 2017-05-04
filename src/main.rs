@@ -130,7 +130,10 @@ fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>) {
 	//let mut state = HashMap::new();
 	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
 	//let mut interpreter = Interpreter::new(&mut state);
-	interpreter.interpret();
+	match interpreter.interpret() {
+        Err(msg) => info!("Error: {}", msg),
+        _ => {}
+    }
 
 
 	//let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);

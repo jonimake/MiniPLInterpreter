@@ -5,7 +5,7 @@ use std::fmt;
 pub enum TokenType {
     Identifier,
     IntegerValue(i32),
-    StringLiteral,
+    StringLiteral(u64),
     BooleanValue(bool),
 
     LParen,

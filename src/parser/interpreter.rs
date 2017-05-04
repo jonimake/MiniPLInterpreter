@@ -3,6 +3,8 @@ use std::iter::Peekable;
 use std::vec::Vec;
 use std::vec::IntoIter;
 use std::slice::Iter;
+use std::result::Result;
+
 use parser::token::Token;
 use parser::token_iterator::TokenIterator;
 use parser::token_type::TokenType;
@@ -10,43 +12,37 @@ use lexeme::Lexeme;
 
 use simplelog;
 
+pub enum InterpError {
+    foo,
+    bar
+}
 
 type TokenIteratorType<'a> = &'a mut Iterator<Item=Token>;
 
+//static STRING_CACHE: HashMap<u64, String>;
+
 pub struct Interpreter<'a>  {
     pub variables: &'a mut HashMap<String, Token>,
-    iterator: Peekable<TokenIteratorType<'a>>
+    iterator: Peekable<TokenIteratorType<'a>>,
+    string_cache: Box<HashMap<u64, String>>
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(iter: TokenIteratorType<'a>, state: &'a mut HashMap<String, Token>) -> Interpreter<'a> {
         Interpreter {
             variables: state,
-            iterator: iter.peekable()
+            iterator: iter.peekable(),
+            string_cache: Box::new(HashMap::new())
         }
     }
 
 
-    pub fn interpret(&mut self) {
+    pub fn interpret(&mut self) -> Result<(), String> {
         while self.iterator.peek().cloned().is_some() {
-            self.statement();
+            self.statement()?
         }
+        Ok(())
     }
-
-/*
-    pub fn default()-> Interpreter<'a>  {
-        let empty:Vec<Token> =vec![];
-        let iter: IntoIter<Token> = empty.into_iter();
-        let asd: &mut Iterator<Item=Token> = &mut iter;
-        Interpreter {
-            variables: HashMap::new(),
-            iterator: asd.peekable()
-        }
-    }
-*/
-
-
-
 
     /*
    stmt    -> var id : type [:= expr]              {var}
@@ -56,22 +52,24 @@ impl<'a> Interpreter<'a> {
    stmt    -> print expr                           {print}
    stmt    -> assert ( expr )                      {assert}
    */
-    fn statement(&mut self) {
+    fn statement(&mut self) -> Result<(), String>{
         let next = self.iterator.peek().cloned();
         if let Some(tt) = next {
             debug!("foobar {:?}", tt.clone());
             match tt.token_type {
-                TokenType::VarKeyword => self.varDecl(),
-                TokenType::Identifier => self.idAssign(),
+                TokenType::VarKeyword => self.varDecl()?,
+                TokenType::Identifier => self.idAssign()?,
                 //TokenType::For => self.forLoop(),
                 //TokenType::Read => self.read(),
-                TokenType::Print => self.print(),
+                TokenType::Print => self.print()?,
                 //TokenType::Assert => self.assertStmt(),
                 _ => {}
             };
 
-            self.expectNext(TokenType::StatementEnd);
+            self.expectNext(TokenType::StatementEnd)?;
+
         }
+        Ok(())
     }
 
     fn setVariableValue(&mut self, name: Token, token: Token) {
@@ -85,33 +83,36 @@ impl<'a> Interpreter<'a> {
         self.variables.get(&name)
     }
 
-    fn idAssign(&mut self) {
-        let id = self.expectNext(TokenType::Identifier);
+    fn idAssign(&mut self) -> Result<(), String>{
+        let id = self.expectNext(TokenType::Identifier)?;
         self.expectPeek(TokenType::ValueDefinition);
-        self.assign(id);
+        self.assign(id)?;
+        Ok(())
     }
 
-    fn varDecl(&mut self) {
+    fn varDecl(&mut self) -> Result<(), String> {
         debug!("fn varDecl");
-        let keyword: Token = self.expectNext(TokenType::VarKeyword);
-        let id: Token = self.expectNext(TokenType::Identifier);
-        let typeassign: Token = self.expectNext(TokenType::TypeDeclaration);
+        let keyword: Token = self.expectNext(TokenType::VarKeyword)?;
+        let id: Token = self.expectNext(TokenType::Identifier)?;
+        let typeassign: Token = self.expectNext(TokenType::TypeDeclaration)?;
         let tokentype = self.iterator.next().unwrap();
         self.setVariableValue(id.clone(), tokentype);
         if self.expectPeek(TokenType::ValueDefinition) {
             debug!("has value def");
-            self.assign(id);
+            return self.assign(id);
         }
+        Ok(())
     }
 
-    fn assign(&mut self, id: Token) {
-        self.expectNext(TokenType::ValueDefinition);
-        let expressionValue: Token = self.expression();
+    fn assign(&mut self, id: Token) -> Result<(), String>{
+        self.expectNext(TokenType::ValueDefinition)?;
+        let expressionValue: Token = self.expression()?;
         debug!("Expression value: {:?}", expressionValue);
         self.setVariableValue(id, expressionValue);
+        Ok(())
     }
 
-    fn print(&mut self) {
+    fn print(&mut self) -> Result<(), String>{
         debug!("fn print");
         let token = self.expectNext(TokenType::Print);
         debug!("print {:?}", token.clone());
@@ -122,18 +123,18 @@ impl<'a> Interpreter<'a> {
                 TokenType::Identifier => {
                     info!("print variable: {:?}", self.getVariableValue(token.clone()));
                 }
-                TokenType::StringLiteral => {
+                TokenType::StringLiteral(_) => {
                     info!("print literal: {:?}", tt);
                 }
                 TokenType::IntegerValue(x)=> {
                     info!("print integer: {:?}", x);
                 }
-                _ => unimplemented!()
+                _ => return Err(format!("Not implemented yet"))
             }
         }
-
+        Ok(())
     }
-    fn expression(&mut self) -> Token {
+    fn expression(&mut self) -> Result<Token, String> {
 
         let mut all_tokens: Vec<Token> = Vec::new();
         loop {
@@ -163,14 +164,6 @@ impl<'a> Interpreter<'a> {
                 | TokenType::Exclamation //negation
                 => {
 
-                /*
-                If the token is an operator, o1, then:
-                    while there is an operator token o2, at the top of the operator stack and either
-                        o1 is left-associative and its precedence is less than or equal to that of o2, or
-                        o1 is right associative, and has precedence less than that of o2,
-                            pop o2 off the operator stack, onto the output queue;
-                    at the end of iteration push o1 onto the operator stack.
-                */
                     while let Some(y) = opstack.last().cloned() {
                         counter = counter+1;
                         if isOperator(&y) && precedenceEqualOrLessThan(token_type,y.token_type) {
@@ -179,22 +172,16 @@ impl<'a> Interpreter<'a> {
                         else {
                             break;
                         }
-                        if(counter > 1000) {
+                        if(counter > 10000) {
                             error!("{:?}", y);
-                            panic!("loop detected");
+                            return Err(format!("loop detected"));
                         }
                     }
                     opstack.push(token);
                 },
                 TokenType::LParen => {opstack.push(token)},
 
-
                 TokenType::RParen => {
-//Until the token at the top of the stack is a left parenthesis, pop operators off the stack onto the output queue.
-//Pop the left parenthesis from the stack, but not onto the output queue.
-//If the token at the top of the stack is a function token, pop it onto the output queue.
-//If the stack runs out without finding a left parenthesis, then there are mismatched parentheses.
-
                     while let Some(token) = opstack.last().cloned() {
                         let tt: TokenType = token.token_type;
                         match tt {
@@ -202,8 +189,6 @@ impl<'a> Interpreter<'a> {
                             _ => {output.push(opstack.pop().unwrap())}
                         }
                     }
-
-
 
                 },
                 //handle operand
@@ -214,20 +199,20 @@ impl<'a> Interpreter<'a> {
             output.push(token);
         }
         debug!("Evaluating postfix");
-        return evaluate_postfix(&mut output);
+        return self.evaluate_postfix(&mut output);
     }
 
-    fn expectNext(&mut self, tt: TokenType) -> Token {
+    fn expectNext(&mut self, tt: TokenType) -> Result<Token, String> {
         let maybetoken = self.iterator.next();
         if let Some(token) = maybetoken {
             trace!("expectNext {:?}, actual {:?}", tt.clone(), token.clone());
             if token.token_type == tt {
-                return token;
+                return Ok(token);
             } else {
-                panic!("\nUnexpected token {:?},\nexpected type {:?}\n", token, tt)
+                return Err(format!("\nUnexpected token {:?},\nexpected type {:?}\n", token, tt));
             }
         }
-        panic!("Expected token but iterator was empty")
+        Err(format!("Expected token but iterator was empty"))
     }
 
     fn expectPeek(&mut self, tt: TokenType) -> bool {
@@ -236,6 +221,65 @@ impl<'a> Interpreter<'a> {
             return token.token_type == tt
         }
         false
+    }
+
+
+    fn evaluate_postfix(&mut self, mut tokens: &mut Vec<Token>) -> Result<Token, String> {
+        let mut stack: Vec<Token> = Vec::new();
+
+        fn binary_op(t1: &Token, t2: &Token, operator_token_type: &TokenType) -> Result<Token, String> {
+            let type1 = t1.token_type;
+            let type2 = t2.token_type;
+
+            match (type1, type2) {
+                (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(a, b, *operator_token_type),
+                t @ _ => return Err(format!("Binary operation not defined for types {:?}", t))
+            }
+        }
+
+        for token in tokens.clone() {
+            debug!("{:?}", token);
+        }
+
+        tokens.reverse();
+        while let Some(nextToken) = tokens.pop() {
+            if isOperator(&nextToken) {
+                //debug!("eval next token {:?}", nextToken.token_type);
+                let operator_token_type = nextToken.token_type;
+                if operator_token_type == TokenType::Exclamation {
+                    let t: Token = tokens.pop().unwrap();
+                } else {
+                    let t1: Token = stack.pop().unwrap();
+                    trace!("pop stack {:?}", t1.clone().token_type);
+                    let t2: Token = stack.pop().unwrap();
+                    trace!("pop stack {:?}", t2.clone().token_type);
+
+                    let result: Token = match (t1.token_type, t2.token_type) {
+                        (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(b, a, operator_token_type)?,
+                        (TokenType::Identifier, _) => {
+                            binary_op(self.getVariableValue(t1).unwrap(), &t2, &operator_token_type)?
+                        },
+                        (_, TokenType::Identifier) => {
+                            binary_op(&t1, self.getVariableValue(t2).unwrap(), &operator_token_type)?
+                        },
+                        (TokenType::StringLiteral(_), TokenType::StringLiteral(_)) => {
+                            Token::new(TokenType::StringLiteral(0), Lexeme::default())
+                        },
+                        _ => unimplemented!()
+                    };
+                    //debug!("push stack {:?}", result.clone().token_type);
+                    stack.push(result);
+                }
+            }  else {
+                //debug!("push stack {:?}", nextToken.clone().token_type);
+                stack.push(nextToken);
+            }
+        }
+        if stack.len() != 1 {
+            panic!("Stack length wasn't 1, error occurred");
+        } else {
+            return Ok(stack[0].clone());
+        }
     }
 }
 
@@ -251,59 +295,24 @@ fn isOperator(token: &Token) -> bool {
     }
 }
 
-fn evaluate_postfix<'a, 'b: 'a>(mut tokens: &'a mut Vec<Token>) -> Token {
-    let mut stack: Vec<Token> = Vec::new();
 
-    for token in tokens.clone() {
-        debug!("{:?}", token);
-    }
-    tokens.reverse();
-    while let Some(nextToken) = tokens.pop() {
-        if isOperator(&nextToken) {
-            //debug!("eval next token {:?}", nextToken.token_type);
-            let operator_token_type = nextToken.token_type;
-            if operator_token_type == TokenType::Exclamation {
-                let t: Token = tokens.pop().unwrap();
-            } else {
-                let t1: Token = stack.pop().unwrap();
-                //debug!("pop stack {:?}", t1.clone().token_type);
-                let t2: Token = stack.pop().unwrap();
-                //debug!("pop stack {:?}", t2.clone().token_type);
-
-                let result = match (t1.token_type, t2.token_type) {
-                    (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(b, a, operator_token_type),
-                    (TokenType::StringLiteral, TokenType::StringLiteral) => {
-                        Token::new(TokenType::StringLiteral, Lexeme::default())
-                    },
-                    _ => unimplemented!()
-                };
-                //debug!("push stack {:?}", result.clone().token_type);
-                stack.push(result);
-            }
-        }  else {
-            //debug!("push stack {:?}", nextToken.clone().token_type);
-            stack.push(nextToken);
-        }
-    }
-    if stack.len() != 1 {
-        panic!("Stack length wasn't 1, error occurred");
-    } else {
-        return stack[0].clone();
-    }
-}
-
-fn binary_integer_op(a: i32, b: i32, op: TokenType) -> Token{
+fn binary_integer_op(a: i32, b: i32, op: TokenType) -> Result<Token, String>{
     let tt = match op {
         TokenType::Addition => TokenType::IntegerValue(a+b),
         TokenType::Subtraction => TokenType::IntegerValue(a-b),
         TokenType::Multiplication => TokenType::IntegerValue(a*b),
-        TokenType::Division => TokenType::IntegerValue(a/b),
+        TokenType::Division => {
+            if b == 0 {
+                return Err(format!("Division by zero: {}/{}",a, b));
+            }
+            TokenType::IntegerValue(a/b)
+        },
         _ => {
-            //debug!("binary_integer_op error: {:?}", op);
-            unimplemented!()
+            return Err(format!("binary_integer_op error: {:?}", op))
+
         }
     };
-    Token::new(tt, Lexeme::default())
+    Ok(Token::new(tt, Lexeme::default()))
 }
 
 fn operation(left: Token, op: Token, right: Token) -> Token {
@@ -413,8 +422,12 @@ fn evaluate_postfix_simple_addition() {
         Token::newString(TokenType::Addition, "+")
     ];
 
-    let res = evaluate_postfix(&mut tokens);
-    assert_eq!(res.token_type, TokenType::IntegerValue(3));
+    let mut iter = vec![].into_iter();
+    let mut state = HashMap::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
+
+    let res = int.evaluate_postfix(&mut tokens);
+    assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(3));
 }
 
 #[test]
@@ -432,9 +445,11 @@ fn evaluate_postfix_complex() {
         Token::newString(TokenType::IntegerValue(3), "3"),
         Token::newString(TokenType::Subtraction, "-")
     ];
-
-    let res = evaluate_postfix(&mut tokens);
-    assert_eq!(res.token_type, TokenType::IntegerValue(14));
+    let mut iter = vec![].into_iter();
+    let mut state = HashMap::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
+    let res = int.evaluate_postfix(&mut tokens);
+    assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(14));
 }
 
 #[test]
@@ -505,7 +520,7 @@ fn parse_print_string_literal() {
     let val = Token::newString(TokenType::IntegerValue(1), "1");
     let tokens: Vec<Token> = vec![
         Token::newString(TokenType::Print, "print"),
-        Token::newString(TokenType::StringLiteral, "foobar"),
+        Token::newString(TokenType::StringLiteral(0), "foobar"),
         Token::newString(TokenType::StatementEnd, ";"),
     ];
 
@@ -559,7 +574,7 @@ fn parse_expression_1() {
     let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression();
     debug!("{:?}", result);
-    assert_eq!(result, Token::new(TokenType::IntegerValue(2), Lexeme::default()));
+    assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(2), Lexeme::default()));
 }
 
 #[test]
@@ -577,7 +592,7 @@ fn parse_expression_2() {
     let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression();
     debug!("{:?}", result);
-    assert_eq!(result, Token::new(TokenType::IntegerValue(0), Lexeme::default()));
+    assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(0), Lexeme::default()));
 }
 
 
@@ -690,7 +705,35 @@ fn parse_expression_3() {
     let result = int.expression();
     println!("result = {:?}", result);
     let expectedValue = Token::newString(TokenType::IntegerValue(16), "");
-    assert_eq!(result, expectedValue);
+    assert_eq!(result.unwrap(), expectedValue);
+}
+
+#[test]
+fn parse_expression_4() {
+    let lexeme = Lexeme::default();
+    // (1+3)*4
+    let tokens: Vec<Token> = vec![
+        Token::newString(TokenType::VarKeyword, "var"),
+        Token::newString(TokenType::Identifier, "x"),
+        Token::newString(TokenType::TypeDeclaration, ":"),
+        Token::newString(TokenType::IntegerType, "int"),
+        Token::newString(TokenType::ValueDefinition, ":="),
+        Token::newString(TokenType::IntegerValue(1), "1"),
+        Token::newString(TokenType::Addition, "+"),
+        Token::newString(TokenType::IntegerValue(3), "3"),
+        Token::newString(TokenType::Multiplication, "*"),
+        Token::newString(TokenType::IntegerValue(2), "2"),
+        Token::newString(TokenType::StatementEnd, ";"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut state = HashMap::new();
+    {
+        let mut int = Interpreter::new(&mut iter, &mut state);
+        int.interpret();
+    }
+
+    assert_eq!(state.get("x"), Some(&Token::newString(TokenType::IntegerValue(7), "")));
 }
 
 #[test]
@@ -705,7 +748,6 @@ fn test_precedence() {
 #[test]
 fn stateful_var_definition() {
     //let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Trace, simplelog::Config::default());
-    let lexeme = Lexeme::default();
     let val = Token::newString(TokenType::IntegerValue(1), "1");
 
     let tokens1: Vec<Token> = vec![
