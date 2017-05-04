@@ -119,7 +119,7 @@ fn eval_file(file_contents: &str) {
 
 }
 
-fn eval_line(line: &str, state: &mut HashMap<String, Token>) {
+fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>) {
 	info!("{:?}", line);
 	let it = LexemeIterator::new(line);
 
@@ -127,7 +127,7 @@ fn eval_line(line: &str, state: &mut HashMap<String, Token>) {
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:it};
 
 	//let mut interpreter = Interpreter::new(tokenIterator);
-	let mut state = HashMap::new();
+	//let mut state = HashMap::new();
 	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
 	//let mut interpreter = Interpreter::new(&mut state);
 	interpreter.interpret();

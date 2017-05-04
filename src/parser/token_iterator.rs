@@ -6,7 +6,7 @@ use lexeme_iterator::LexemeIterator;
 use parser::token::Token;
 use parser::token_type::TokenType;
 
-fn getToken<'a> (lx: Lexeme) -> Result<Token, String> {
+fn getToken (lx: Lexeme) -> Result<Token, String> {
     match lx {
         Lexeme{lexeme_type: LexemeType::single_char,..} => getSingleCharToken(lx),
         Lexeme{lexeme_type: LexemeType::two_char,..} => getTwoCharToken(lx),
@@ -19,15 +19,15 @@ fn getToken<'a> (lx: Lexeme) -> Result<Token, String> {
 }
 
 
-fn getStringLiteralToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getStringLiteralToken(lx: Lexeme) -> Result<Token, String> {
     Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral})
 }
 
-fn getIdentifierToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getIdentifierToken(lx: Lexeme) -> Result<Token, String> {
     Ok(Token{lexeme:lx, token_type:TokenType::Identifier})
 }
 
-fn getIntegerToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getIntegerToken(lx: Lexeme) -> Result<Token, String> {
     if let Ok(value) = lx.lexeme.parse::<i32>() {
         Ok(Token{lexeme:lx, token_type:TokenType::IntegerValue(value)})
     } else {
@@ -35,7 +35,7 @@ fn getIntegerToken<'a>(lx: Lexeme) -> Result<Token, String> {
     }
 }
 
-fn getTwoCharToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getTwoCharToken(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         ".." => Ok(Token{lexeme:lx, token_type:TokenType::RangeDots}),
         ":=" => Ok(Token{lexeme:lx, token_type:TokenType::ValueDefinition}),
@@ -43,7 +43,7 @@ fn getTwoCharToken<'a>(lx: Lexeme) -> Result<Token, String> {
     }
 }
 
-fn getKeywordToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getKeywordToken(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         "var" => Ok(Token{lexeme:lx, token_type:TokenType::VarKeyword}),
         "assert" => Ok(Token{lexeme:lx, token_type:TokenType::Assert}),
@@ -63,7 +63,7 @@ fn getKeywordToken<'a>(lx: Lexeme) -> Result<Token, String> {
     }
 }
 
-fn getSingleCharToken<'a>(lx: Lexeme) -> Result<Token, String> {
+fn getSingleCharToken(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
         "(" => Ok(Token{lexeme:lx, token_type:TokenType::LParen}),
         ")" => Ok(Token{lexeme:lx, token_type:TokenType::RParen}),

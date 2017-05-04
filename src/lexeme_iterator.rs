@@ -84,7 +84,7 @@ impl<'a>  LexemeIterator<'a>  {
 	fn handle_end_of_line(&mut self) -> bool {
 		//println!("{}, {}", self.current_line_char_pos, self.current_line.len());
 		//self.visualize_line_slice("", self.current_line_char_pos, self.current_line.len());
-		if(self.current_line_char_pos >= self.current_line.len() ) { //get next line chars iterator if at the end
+		if self.current_line_char_pos >= self.current_line.len() { //get next line chars iterator if at the end
 			match self.lines.next() {
 				Some((line_number, line)) => {
 					if(!self.initialized) {
