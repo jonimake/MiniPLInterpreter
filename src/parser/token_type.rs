@@ -1,11 +1,13 @@
 use std::fmt;
 
+use lexeme::Lexeme;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TokenType {
     Identifier,
     IntegerValue(i32),
     StringLiteral(u64),
+    //StringLiteral(&'a Lexeme),
     BooleanValue(bool),
 
     LParen,

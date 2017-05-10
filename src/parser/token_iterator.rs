@@ -1,4 +1,7 @@
 use std::iter::Peekable;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::collections::hash_map::DefaultHasher;
 
 use lexeme::Lexeme;
 use lexeme::LexemeType;
@@ -20,7 +23,10 @@ fn getToken (lx: Lexeme) -> Result<Token, String> {
 
 
 fn getStringLiteralToken(lx: Lexeme) -> Result<Token, String> {
-    Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral(0)})
+    let mut hasher = DefaultHasher::new();
+    lx.lexeme.hash(&mut hasher);
+    let hash: u64 = hasher.finish();
+    Ok(Token{lexeme:lx, token_type:TokenType::StringLiteral(hash)})
 }
 
 fn getIdentifierToken(lx: Lexeme) -> Result<Token, String> {

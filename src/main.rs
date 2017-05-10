@@ -67,6 +67,8 @@ fn main() {
 
 	let mut absolute_path = env::current_dir().unwrap();
 	let mut state: HashMap<String, Token> = HashMap::new();
+    //let mut string_cache: Box<HashMap<u64, String>> = Box::new(HashMap::new());
+    let mut string_cache: HashMap<u64, String> = HashMap::new();
 
 	debug!("The current directory is {}", absolute_path.display());
 	absolute_path.push(path);
@@ -95,7 +97,7 @@ fn main() {
 				match line {
 					Ok(content) => {
 						if content == exit_keyword {break;}
-						eval_line(&content, &mut state);
+						eval_line(&content, &mut state, &mut string_cache);
 					},
 					Err(errmsg) => {error!("Error: {}", errmsg); break},
 				}
@@ -106,9 +108,10 @@ fn main() {
 
 fn eval_file(file_contents: &str) {
 	let mut state = HashMap::new();
+	let mut string_cache = HashMap::new();
 	let mut lexeme_it = LexemeIterator::new(file_contents);
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:lexeme_it};
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
+	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state, &mut string_cache);
 	//let mut interpreter = Interpreter::new(&mut state);
 	interpreter.interpret();
 	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
@@ -119,7 +122,7 @@ fn eval_file(file_contents: &str) {
 
 }
 
-fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>) {
+fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
 	info!("{:?}", line);
 	let it = LexemeIterator::new(line);
 
@@ -128,7 +131,8 @@ fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>) {
 
 	//let mut interpreter = Interpreter::new(tokenIterator);
 	//let mut state = HashMap::new();
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
+	let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
+	//let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
 	//let mut interpreter = Interpreter::new(&mut state);
 	match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
