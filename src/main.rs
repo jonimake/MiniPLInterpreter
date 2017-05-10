@@ -47,23 +47,22 @@ fn main() {
 			"warn" => simplelog::LogLevelFilter::Warn,
 			_ => simplelog::LogLevelFilter::Info
 		};
-		let log = simplelog::TermLogger::init(level, simplelog::Config::default());
+		let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
 		info!("Log level: {}", level);
 
 	} else {
-		let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info, simplelog::Config::default());
+        let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info, simplelog::Config::default());
 	}
 
 
 	info!("MiniPL Interpreter starting!");
 
-	let mut path = Path::new("");
 	let mut pathStr: &str = "";
     if args.len() > 1 {
 		pathStr = &args[1];
     }
 
-	path = Path::new(pathStr);
+	let path = Path::new(pathStr);
 
 	let mut absolute_path = env::current_dir().unwrap();
 	let mut state: HashMap<String, Token> = HashMap::new();
@@ -74,7 +73,7 @@ fn main() {
 	absolute_path.push(path);
 	let exit_keyword = "exit";
 	debug!("The file is {}", absolute_path.display());
-	let exitString = "exit".to_string();
+
 	match path.exists() && path.is_file() {
 		true => { //lexemeize file
 
@@ -109,11 +108,11 @@ fn main() {
 fn eval_file(file_contents: &str) {
 	let mut state = HashMap::new();
 	let mut string_cache = HashMap::new();
-	let mut lexeme_it = LexemeIterator::new(file_contents);
+	let lexeme_it = LexemeIterator::new(file_contents);
 	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:lexeme_it};
 	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state, &mut string_cache);
 	//let mut interpreter = Interpreter::new(&mut state);
-	interpreter.interpret();
+	let _ = interpreter.interpret();
 	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
 	//let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
 	//let tokens: Vec<Token> = tokenIterator.collect();

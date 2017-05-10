@@ -186,7 +186,7 @@ impl<'a> Iterator for LexemeIterator<'a> {
 				let (lexemetype, matcher_fn): (LexemeType, fn(&str) -> bool) = *tuple_ref;
 				if(matcher_fn(lexeme_candidate)) {
 					let line_pos_start = self.current_line_char_pos;
-					let line_pos_end = self.current_line_char_pos + lexeme_candidate.len();
+					//let line_pos_end = self.current_line_char_pos + lexeme_candidate.len();
 					let lexeme_length = lexeme_candidate.chars().count();
 					if(lexeme_length > longest_lexeme) { //prioritize length
 						//println!("New longest lexeme {:?}, {:?}, {:?}", lexeme_candidate ,lexemetype, lexeme_length);

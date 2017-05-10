@@ -65,7 +65,7 @@ impl<'a> Interpreter<'a> {
             match tt.token_type {
                 TokenType::VarKeyword => self.varDecl()?,
                 TokenType::Identifier => self.idAssign()?,
-                //TokenType::For => self.forLoop(),
+                TokenType::For => self.forLoop()?,
                 //TokenType::Read => self.read(),
                 TokenType::Print => self.print()?,
                 //TokenType::Assert => self.assertStmt(),
@@ -75,6 +75,61 @@ impl<'a> Interpreter<'a> {
             self.expectNext(TokenType::StatementEnd)?;
 
         }
+        Ok(())
+    }
+
+    fn forLoop(&mut self) -> Result<(), String> {
+        //for x in 0..nTimes-1 do
+        self.expectNext(TokenType::For)?;
+        let loopId = self.expectNext(TokenType::Identifier)?;
+
+        self.expectNext(TokenType::In)?;
+        let rangeStart: Token = self.expression(Some(TokenType::RangeDots))?;
+        debug!("range start {}", rangeStart);
+        self.expectNext(TokenType::RangeDots)?;
+        let rangeEnd: Token = self.expression(Some(TokenType::Do))?;
+
+        self.expectNext(TokenType::Do);
+        //read all tokens until end for
+        let mut all_tokens: Vec<Token> = Vec::new();
+
+        loop {
+            let next = self.iterator.next();
+            if let Some(tt) = next {
+                if tt.token_type == TokenType::End {
+                    self.expectNext(TokenType::For);
+                    break;
+                }
+                else {
+                    all_tokens.push(tt);
+                }
+            } else {
+                break;
+            }
+        }
+
+        debug!("{:?}", all_tokens);
+
+
+        //let tokenIter: Iterator<Item=Token> = all_tokens.into_iter();
+
+        match (rangeStart, rangeEnd) {
+            (Token{token_type: TokenType::IntegerValue(startInt), .. },
+             Token{token_type: TokenType::IntegerValue(endInt), .. }) => {
+                for x in startInt .. endInt {
+                    let mut tokenIter = all_tokens.clone().into_iter();
+                    //not sure if doing something incredibly dirty
+                    self.setVariableValue(loopId.clone(), Token::new(TokenType::IntegerValue(x), Lexeme::default()));
+                    let mut int = Interpreter::new(
+                        &mut tokenIter as &mut Iterator<Item=Token>,
+                        &mut self.variables,
+                        &mut self.string_cache);
+                    int.interpret()?;
+                }
+            },
+            _ => return Err(format!("Ranges not implemented for other than integer starts and ends"))
+        }
+
         Ok(())
     }
 
@@ -98,9 +153,9 @@ impl<'a> Interpreter<'a> {
 
     fn varDecl(&mut self) -> Result<(), String> {
         debug!("fn varDecl");
-        let keyword: Token = self.expectNext(TokenType::VarKeyword)?;
+        self.expectNext(TokenType::VarKeyword)?;
         let id: Token = self.expectNext(TokenType::Identifier)?;
-        let typeassign: Token = self.expectNext(TokenType::TypeDeclaration)?;
+        self.expectNext(TokenType::TypeDeclaration)?;
         let tokentype = self.iterator.next().unwrap();
         self.setVariableValue(id.clone(), tokentype);
         if self.expectPeek(TokenType::ValueDefinition) {
@@ -112,7 +167,7 @@ impl<'a> Interpreter<'a> {
 
     fn assign(&mut self, id: Token) -> Result<(), String>{
         self.expectNext(TokenType::ValueDefinition)?;
-        let expressionValue: Token = self.expression()?;
+        let expressionValue: Token = self.expression(None)?;
         debug!("Expression value: {:?}", expressionValue);
         self.setVariableValue(id, expressionValue);
         Ok(())
@@ -127,7 +182,8 @@ impl<'a> Interpreter<'a> {
             let tt: TokenType = token.token_type;
             match tt {
                 TokenType::Identifier => {
-                    info!("{} => {:?}", token.lexeme.lexeme, self.getVariableValue(token.clone()));
+                    let maybeToken: Option<&Token> = self.getVariableValue(token.clone());
+                    info!("{} => {}", token.lexeme.lexeme, maybeToken.unwrap());
                 }
                 TokenType::StringLiteral(_) => {
                     info!("{:?}", tt);
@@ -140,12 +196,12 @@ impl<'a> Interpreter<'a> {
         }
         Ok(())
     }
-    fn expression(&mut self) -> Result<Token, String> {
+    fn expression(&mut self, terminator_symbol: Option<TokenType>) -> Result<Token, String> {
 
         let mut all_tokens: Vec<Token> = Vec::new();
         loop {
-            let token = self.iterator.peek().cloned().unwrap_or(Token::new(TokenType::StatementEnd, Lexeme::default()));
-            if token.token_type == TokenType::StatementEnd {break;}
+            let token = self.iterator.peek().cloned().unwrap_or(Token::new(terminator_symbol.unwrap_or(TokenType::StatementEnd), Lexeme::default()));
+            if token.token_type == terminator_symbol.unwrap_or(TokenType::StatementEnd) {break;}
             else {
                 all_tokens.push(self.iterator.next().unwrap());
             }
@@ -167,7 +223,7 @@ impl<'a> Interpreter<'a> {
                 | TokenType::Multiplication
                 | TokenType::Division
                 | TokenType::Subtraction
-                | TokenType::Exclamation //negation
+                | TokenType::Negation //negation
                 => {
 
                     while let Some(y) = opstack.last().cloned() {
@@ -192,7 +248,7 @@ impl<'a> Interpreter<'a> {
                         let tt: TokenType = token.token_type;
                         match tt {
                             TokenType::LParen => {opstack.pop();},
-                            _ => {output.push(opstack.pop().unwrap())}
+                            _ => output.push(opstack.pop().unwrap())
                         }
                     }
 
@@ -252,8 +308,9 @@ impl<'a> Interpreter<'a> {
             if isOperator(&nextToken) {
                 //debug!("eval next token {:?}", nextToken.token_type);
                 let operator_token_type = nextToken.token_type;
-                if operator_token_type == TokenType::Exclamation {
-                    let t: Token = tokens.pop().unwrap();
+                if operator_token_type == TokenType::Negation {
+                    let _ = tokens.pop();
+                    unimplemented!();
                 } else {
                     let t1: Token = stack.pop().unwrap();
                     trace!("pop stack {:?}", t1.clone().token_type);
@@ -284,7 +341,9 @@ impl<'a> Interpreter<'a> {
         if stack.len() != 1 {
             panic!("Stack length wasn't 1, error occurred");
         } else {
-            return Ok(stack[0].clone());
+            let result = Ok(stack[0].clone());
+            debug!("Result: {:?}", result);
+            return result;
         }
     }
 }
@@ -296,7 +355,7 @@ fn isOperator(token: &Token) -> bool {
         | TokenType::Multiplication
         | TokenType::Division
         | TokenType::Subtraction
-        | TokenType::Exclamation => true,
+        | TokenType::Negation => true,
         _ => false
     }
 }
@@ -344,7 +403,7 @@ fn RPN(all_tokens: Vec<Token>) -> Vec<Token>{
             | TokenType::Multiplication
             | TokenType::Division
             | TokenType::Subtraction
-            | TokenType::Exclamation //negation
+            | TokenType::Negation //negation
             => {
                 while let Some(y) = stack.first().cloned() {
                     if isOperator(&y) && precedenceEqualOrLessThan(token_type,y.token_type) {
@@ -570,7 +629,7 @@ fn parse_expression_1() {
     let mut state = HashMap::new();
     let mut strings = HashMap::new();
     let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
-    let result = int.expression();
+    let result = int.expression(None);
     debug!("{:?}", result);
     assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(2), Lexeme::default()));
 }
@@ -589,7 +648,7 @@ fn parse_expression_2() {
     let mut state = HashMap::new();
     let mut strings = HashMap::new();
     let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
-    let result = int.expression();
+    let result = int.expression(None);
     debug!("{:?}", result);
     assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(0), Lexeme::default()));
 }
@@ -626,7 +685,7 @@ fn is_operator_test() {
     assert!(isOperator(&Token::newString(TokenType::Addition, "*")));
     assert!(isOperator(&Token::newString(TokenType::Addition, "-")));
     assert!(isOperator(&Token::newString(TokenType::Addition, "/")));
-    assert!(isOperator(&Token::newString(TokenType::Exclamation, "!")));
+    assert!(isOperator(&Token::newString(TokenType::Negation, "!")));
 }
 
 #[test]
@@ -658,7 +717,7 @@ fn parse_var_definition_expression_2() {
 
 //#[test]
 fn parse_var_definition_expression_3() {
-    let lexeme = Lexeme::default();
+
     // var x: int := (1+3)*4
     let tokens: Vec<Token> = vec![
         Token::newString(TokenType::VarKeyword, "var"),
@@ -680,7 +739,7 @@ fn parse_var_definition_expression_3() {
     let mut state = HashMap::new();
     let mut strings = HashMap::new();
     let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
-    int.interpret();
+    assert!(int.interpret().is_ok());
     assert!(int.variables.contains_key("x"));
     let expectedValue = Token::newString(TokenType::IntegerValue(12), "12");
     assert_eq!(int.variables.get("x"), Some(&expectedValue));
@@ -705,7 +764,7 @@ fn parse_expression_3() {
     let mut state = HashMap::new();
     let mut strings = HashMap::new();
     let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
-    let result = int.expression();
+    let result = int.expression(None);
     println!("result = {:?}", result);
     let expectedValue = Token::newString(TokenType::IntegerValue(16), "");
     assert_eq!(result.unwrap(), expectedValue);
@@ -775,12 +834,12 @@ fn stateful_var_definition() {
     {
         let mut iter = tokens1.into_iter();
         let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
-        int.interpret();
+        let _ = int.interpret();
     }
     {
         let mut iter = tokens2.into_iter();
         let mut int2 = Interpreter::new(&mut iter, &mut state, &mut strings);
-        int2.interpret();
+        let _ = int2.interpret();
     }
 
 

@@ -80,7 +80,7 @@ fn getSingleCharToken(lx: Lexeme) -> Result<Token, String> {
         "<" => Ok(Token{lexeme:lx, token_type:TokenType::LessThan}),
         "=" => Ok(Token{lexeme:lx, token_type:TokenType::Equal}),
         "&" => Ok(Token{lexeme:lx, token_type:TokenType::And}),
-        "!" => Ok(Token{lexeme:lx, token_type:TokenType::Exclamation}),
+        "!" => Ok(Token{lexeme:lx, token_type:TokenType::Negation }),
         ";" => Ok(Token{lexeme:lx, token_type:TokenType::StatementEnd}),
         "." => Ok(Token{lexeme:lx, token_type:TokenType::Stop}),
         ":" => Ok(Token{lexeme:lx, token_type:TokenType::TypeDeclaration}),

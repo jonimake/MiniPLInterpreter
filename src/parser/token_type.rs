@@ -36,7 +36,7 @@ pub enum TokenType {
     Division,
     LessThan,
     Equal,
-    Exclamation,
+    Negation,
     And,
     Stop,
     StatementEnd,
@@ -44,4 +44,14 @@ pub enum TokenType {
     RangeDots,
 
     EOF
+}
+
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TokenType::IntegerValue(integer) => write!(f, "{}", integer),
+            TokenType::BooleanValue(boolean) => write!(f, "{}", boolean),
+            _ => write!(f, "{}", "unimplemented")
+        }
+    }
 }
