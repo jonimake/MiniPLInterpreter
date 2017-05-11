@@ -9,4 +9,4 @@ simplelog = "0.4.2"
 
 [dev-dependencies]
 cargo-watch = "5.0.1"
-clippy = "0.0.131"
+#clippy = "0.0.131"

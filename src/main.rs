@@ -36,135 +36,144 @@ use std::vec::Vec;
 static HAS_INIT: bool = false;
 
 fn main() {
-	let args = env::args().collect::<Vec<String>>();
-	info!("{:?}", args);
-	if args.len() > 2 {
-		let level: simplelog::LogLevelFilter = match args[2].as_ref() {
-			"info" => simplelog::LogLevelFilter::Info,
-			"debug" => simplelog::LogLevelFilter::Debug,
-			"error" => simplelog::LogLevelFilter::Error,
-			"trace" => simplelog::LogLevelFilter::Trace,
-			"warn" => simplelog::LogLevelFilter::Warn,
-			_ => simplelog::LogLevelFilter::Info
-		};
-		let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
-		info!("Log level: {}", level);
+    let args = env::args().collect::<Vec<String>>();
+    info!("{:?}", args);
+    if args.len() > 2 {
+        let level: simplelog::LogLevelFilter = match args[2].as_ref() {
+            "info" => simplelog::LogLevelFilter::Info,
+            "debug" => simplelog::LogLevelFilter::Debug,
+            "error" => simplelog::LogLevelFilter::Error,
+            "trace" => simplelog::LogLevelFilter::Trace,
+            "warn" => simplelog::LogLevelFilter::Warn,
+            _ => simplelog::LogLevelFilter::Info,
+        };
+        let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
+        info!("Log level: {}", level);
 
-	} else {
-        let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info, simplelog::Config::default());
-	}
-
-
-	info!("MiniPL Interpreter starting!");
-
-	let mut pathStr: &str = "";
-    if args.len() > 1 {
-		pathStr = &args[1];
+    } else {
+        let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
+                                            simplelog::Config::default());
     }
 
-	let path = Path::new(pathStr);
 
-	let mut absolute_path = env::current_dir().unwrap();
-	let mut state: HashMap<String, Token> = HashMap::new();
+    info!("MiniPL Interpreter starting!");
+
+    let mut pathStr: &str = "";
+    if args.len() > 1 {
+        pathStr = &args[1];
+    }
+
+    let path = Path::new(pathStr);
+
+    let mut absolute_path = env::current_dir().unwrap();
+    let mut state: HashMap<String, Token> = HashMap::new();
     //let mut string_cache: Box<HashMap<u64, String>> = Box::new(HashMap::new());
     let mut string_cache: HashMap<u64, String> = HashMap::new();
 
-	debug!("The current directory is {}", absolute_path.display());
-	absolute_path.push(path);
-	let exit_keyword = "exit";
-	debug!("The file is {}", absolute_path.display());
+    debug!("The current directory is {}", absolute_path.display());
+    absolute_path.push(path);
+    let exit_keyword = "exit";
+    debug!("The file is {}", absolute_path.display());
 
-	match path.exists() && path.is_file() {
-		true => { //lexemeize file
+    match path.exists() && path.is_file() {
+        true => {
+            //lexemeize file
 
-			let f = File::open(path).unwrap();
-			let mut reader = BufReader::new(f);
+            let f = File::open(path).unwrap();
+            let mut reader = BufReader::new(f);
 
-			let mut buffer = String::new();
-			reader.read_to_string(&mut buffer).unwrap();
-			info!("File read");
-			buffer.trim_left_matches("\u{feff}");
+            let mut buffer = String::new();
+            reader.read_to_string(&mut buffer).unwrap();
+            info!("File read");
+            buffer.trim_left_matches("\u{feff}");
 
-			eval_file(&buffer);
-		},
-		false => { //capture input and start lexemeizing that
-			info!("Type commands");
-			info!("Type {:?} to exit", exit_keyword);
-			info!("MiniPL> ");
-			let stdin = io::stdin();
-			for line in stdin.lock().lines() {
-				match line {
-					Ok(content) => {
-						if content == exit_keyword {break;}
-						eval_line(&content, &mut state, &mut string_cache);
-					},
-					Err(errmsg) => {error!("Error: {}", errmsg); break},
-				}
-			}
-		} ,
-	};
+            eval_file(&buffer);
+        }
+        false => {
+            //capture input and start lexemeizing that
+            info!("Type commands");
+            info!("Type {:?} to exit", exit_keyword);
+            info!("MiniPL> ");
+            let stdin = io::stdin();
+            for line in stdin.lock().lines() {
+                match line {
+                    Ok(content) => {
+                        if content == exit_keyword {
+                            break;
+                        }
+                        eval_line(&content, &mut state, &mut string_cache);
+                    }
+                    Err(errmsg) => {
+                        error!("Error: {}", errmsg);
+                        break;
+                    }
+                }
+            }
+        }
+    };
 }
 
-fn eval_file(file_contents: &str) {
-	let mut state = HashMap::new();
-	let mut string_cache = HashMap::new();
-	let lexeme_it = LexemeIterator::new(file_contents);
-	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:lexeme_it};
-	let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state, &mut string_cache);
-	//let mut interpreter = Interpreter::new(&mut state);
-	let _ = interpreter.interpret();
-	//let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
-	//let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
-	//let tokens: Vec<Token> = tokenIterator.collect();
-	//let mut ast = AST::new(tokens.as_ref());
-	//ast.interpret();
+fn eval_file(file_contents: &str) -> Result<(), String> {
+    let mut state = HashMap::new();
+    let mut string_cache = HashMap::new();
+    let lexeme_it = LexemeIterator::new(file_contents);
+    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: lexeme_it };
+    let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item = Token>,
+                                           &mut state,
+                                           &mut string_cache);
+    //let mut interpreter = Interpreter::new(&mut state);
+    interpreter.interpret()
+    //let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
+    //let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
+    //let tokens: Vec<Token> = tokenIterator.collect();
+    //let mut ast = AST::new(tokens.as_ref());
+    //ast.interpret();
 
 }
 
-fn eval_line<>(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
-	info!("{:?}", line);
-	let it = LexemeIterator::new(line);
+fn eval_line(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
+    info!("{:?}", line);
+    let it = LexemeIterator::new(line);
 
 
-	let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator{lexIter:it};
+    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: it };
 
-	//let mut interpreter = Interpreter::new(tokenIterator);
-	//let mut state = HashMap::new();
-	let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
-	//let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
-	//let mut interpreter = Interpreter::new(&mut state);
-	match interpreter.interpret() {
+    //let mut interpreter = Interpreter::new(tokenIterator);
+    //let mut state = HashMap::new();
+    let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
+    //let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
+    //let mut interpreter = Interpreter::new(&mut state);
+    match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
         _ => {}
     }
 
 
-	//let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
-	//let m: Vec<Token> = tokenIterator.collect();
-	//info!("tokens:{:?}", m);
-	//let mut ast = AST::new(m.as_ref());
-	//ast.interpret();
+    //let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
+    //let m: Vec<Token> = tokenIterator.collect();
+    //info!("tokens:{:?}", m);
+    //let mut ast = AST::new(m.as_ref());
+    //ast.interpret();
 
 }
 
-//#[test]
-fn sample1_var_definition_expression_print(){
-	let code =r#"
+#[test]
+fn sample1_var_definition_expression_print() {
+    let code = r#"
 var X : int := 4 + (6 * 2);
 print X;
 "#;
-	eval_file(code);
-	assert!(true);
+    eval_file(code).unwrap();
 
 }
 
 
-//#[test]
-fn sample2_loop_print(){
-	let code =r#"
+#[test]
+fn sample2_loop_print() {
+    let code = r#"
 var nTimes : int := 0;
 print "How many times?";
-read nTimes;
+nTimes := 3;
 var x : int;
 for x in 0..nTimes-1 do
 	print x;
@@ -172,32 +181,16 @@ for x in 0..nTimes-1 do
 end for;
 assert (x = nTimes);
 "#;
-	eval_file(code);
+    eval_file(code).unwrap();
 }
 
-//#[test]
-fn sample3_loop_multiply(){
-	let code =r#"
-print "Give a number";
-var n : int;
-read n;
-var f : int := 1;
-var i : int;
-for i in 1..n do
-	f := f * i;
-end for;
-print "The result is: ";
-print f;
-"#;
-	eval_file(code);
-}
 
-//#[test]
-fn sample4_decl_assign_print(){
-	let code =r#"
+#[test]
+fn sample4_decl_assign_print() {
+    let code = r#"
 var X : int;
 X := 15;
 print X;
 "#;
-	eval_file(code);
+    eval_file(code).unwrap();
 }
