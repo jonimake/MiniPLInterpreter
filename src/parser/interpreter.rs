@@ -31,6 +31,7 @@ pub struct Interpreter<'a> {
     pub variables: &'a mut HashMap<String, Token>,
     iterator: Peekable<TokenIteratorType<'a>>,
     string_cache: &'a mut HashMap<u64, String>,
+
 }
 
 impl<'a> Interpreter<'a> {
@@ -87,7 +88,7 @@ impl<'a> Interpreter<'a> {
         match assertValue {
             Token { token_type: TokenType::BooleanValue(true), .. } => Ok(()),
             Token { token_type: TokenType::BooleanValue(false), .. } => Err(format!("assertion error")),
-            _ => return Err("error evaluating assertion value".to_string()),
+            _ => Err("error evaluating assertion value".to_string()),
         }
     }
 
@@ -127,7 +128,7 @@ impl<'a> Interpreter<'a> {
 
         match (rangeStart, rangeEnd) {
             (Token { token_type: TokenType::IntegerValue(startInt), .. }, Token { token_type: TokenType::IntegerValue(endInt), .. }) => {
-                for x in startInt..endInt {
+                for x in startInt..endInt+1 {
                     let mut tokenIter = all_tokens.clone().into_iter();
                     //not sure if doing something incredibly dirty
                     self.setVariableValue(loopId.clone(),
@@ -146,6 +147,7 @@ impl<'a> Interpreter<'a> {
 
     fn setVariableValue(&mut self, name: Token, token: Token) {
         debug!("{:?} => {:?}", name.lexeme.lexeme, token);
+
         self.variables.insert(name.lexeme.lexeme.to_string(), token);
     }
 
@@ -193,11 +195,15 @@ impl<'a> Interpreter<'a> {
             let tt: TokenType = token.token_type;
             match tt {
                 TokenType::Identifier => {
-                    let maybeToken: Option<&Token> = self.getVariableValue(token.clone());
-                    info!("{} => {}", token.lexeme.lexeme, maybeToken.unwrap());
+                    match self.getVariableValue(token.clone()) {
+                        Some(var) => info!("{} => {:?}", token.lexeme.lexeme, var),
+                        None => info!("{} => None", token.lexeme.lexeme),
+                        _ => panic!(),
+                    };
+
                 }
-                TokenType::StringLiteral(_) => {
-                    info!("{:?}", tt);
+                TokenType::StringLiteral(hash) => {
+                    info!("{:?} => '{}'", token, self.string_cache.get(&hash).unwrap_or(&"''".to_string()));
                 }
                 TokenType::IntegerValue(x) => {
                     info!("{}", x);
@@ -239,7 +245,8 @@ impl<'a> Interpreter<'a> {
                 | TokenType::Multiplication
                 | TokenType::Division
                 | TokenType::Subtraction
-                | TokenType::Negation //negation
+                | TokenType::Equal
+                | TokenType::Negation
                 => {
 
                     while let Some(y) = opstack.last().cloned() {
@@ -311,7 +318,7 @@ impl<'a> Interpreter<'a> {
 
             match (type1, type2) {
                 (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(a, b, *operator_token_type),
-                t @ _ => return Err(format!("Binary operation not defined for types {:?}", t)),
+                t @ _ => return Err(format!("Binary operation {:?} not defined for types {:?}", operator_token_type, t)),
             }
         }
 
@@ -638,9 +645,8 @@ fn parse_expression_1() {
 
 #[test]
 fn parse_assert() {
-
     let tokens: Vec<Token> = vec![Token::newString(TokenType::Assert, "assert"),
-                                  Token::newString(TokenType::Subtraction, "("),
+                                  Token::newString(TokenType::LParen, "("),
                                   Token::newString(TokenType::IntegerValue(1), "1"),
                                   Token::newString(TokenType::Equal, "="),
                                   Token::newString(TokenType::IntegerValue(1), "1"),
@@ -656,7 +662,6 @@ fn parse_assert() {
 
 #[test]
 fn evaluate_postfix_equality() {
-
     let mut tokens: Vec<Token> = vec![Token::newString(TokenType::IntegerValue(1), "1"),
                                       Token::newString(TokenType::IntegerValue(1), "1"),
                                       Token::newString(TokenType::Equal, "=")];
