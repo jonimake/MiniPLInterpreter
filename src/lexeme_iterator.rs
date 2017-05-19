@@ -172,12 +172,12 @@ impl<'a> Iterator for LexemeIterator<'a> {
             }
             //println!("{}",lexeme_candidate);
 
-            if (!skipped_initial_whitespace &&
+            if !skipped_initial_whitespace &&
                 lexeme_candidate
                     .chars()
                     .nth(0)
                     .unwrap_or('a')
-                    .is_whitespace()) {
+                    .is_whitespace() {
                 //skip rest of whitespace
                 skipping_whitespace = true;
                 self.current_line_char_pos += 1;

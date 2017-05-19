@@ -273,8 +273,11 @@ impl<'a, I> Iterator for TokenIterator<I>
             Some(lexeme) => {
                 let x = getToken(lexeme);
                 match x {
-                    Ok(x) => Some(x),
-                    Err(_) => None,
+                    Ok(t) => Some(t),
+                    Err(_) => {
+                        error!("{:?}",x);
+                        None
+                    },
                 }
             }
             None => None,

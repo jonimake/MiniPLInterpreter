@@ -70,7 +70,7 @@ impl<'a> Interpreter<'a> {
                 TokenType::VarKeyword => self.varDecl()?,
                 TokenType::Identifier => self.idAssign()?,
                 TokenType::For => self.forLoop()?,
-                //TokenType::Read => self.read(),
+                TokenType::Read => self.read()?,
                 TokenType::Print => self.print()?,
                 TokenType::Assert => self.assert()?,
                 t @ _ => return Err(format!("Unexpected token in statement parsing {:?}", t)),
@@ -79,6 +79,58 @@ impl<'a> Interpreter<'a> {
             self.expectNext(TokenType::StatementEnd)?;
 
         }
+        Ok(())
+    }
+
+    fn read(&mut self) -> Result<(), String> {
+
+        let tokens: (Token, Token) = {
+            let _ = self.expectNext(TokenType::Read)?;
+            let id = self.expectNext(TokenType::Identifier)?;
+            let maybetoken = self.getVariableValue(&id);
+            let variable = match maybetoken {
+                Some(t) => t,
+                None => return Err(format!("Can't read variable with an invalid variable ID")),
+            };
+
+            use std::io;
+
+            let mut input_text = String::new();
+            io::stdin()
+                .read_line(&mut input_text)
+                .expect("failed to read from stdin");
+
+            let trimmed = input_text.trim();
+            println!("read '{}'", trimmed);
+
+            let t: Token = match variable {
+                Token { token_type: TokenType::IntegerValue(_), .. }
+                | Token { token_type: TokenType::IntegerType, .. }
+                => {
+                    //todo parse integer from string and set that value to vars
+                    let parsed_value = trimmed.parse::<i32>().unwrap_or(0);
+                    let tt = TokenType::IntegerValue(parsed_value);
+                    Token::newString(tt, trimmed)
+                },
+                Token { token_type: TokenType::BooleanType, .. }
+                | Token { token_type: TokenType::BooleanValue(_), .. }
+                => {
+                    let parsed_value = trimmed.parse::<bool>().unwrap_or(false);
+                    let tt = TokenType::BooleanValue(parsed_value);
+                    Token::newString(tt, trimmed)
+                },
+                Token { token_type: TokenType::StringType, .. }
+                | Token { token_type: TokenType::StringLiteral(_), .. }
+                => {
+                    let tt = TokenType::StringLiteral(0);
+                    Token::newString(tt, trimmed)
+                }
+                _ => return Err(format!("Variable not defined for read"))
+            };
+            (id, t)
+        };
+        println!("{:?}", tokens);
+        self.setVariableValue(tokens.0, tokens.1);
         Ok(())
     }
 
@@ -103,7 +155,7 @@ impl<'a> Interpreter<'a> {
         self.expectNext(TokenType::RangeDots)?;
         let rangeEnd: Token = self.expression(Some(TokenType::Do))?;
 
-        self.expectNext(TokenType::Do);
+        self.expectNext(TokenType::Do)?;
         //read all tokens until end for
         let mut all_tokens: Vec<Token> = Vec::new();
 
@@ -111,7 +163,7 @@ impl<'a> Interpreter<'a> {
             let next = self.iterator.next();
             if let Some(tt) = next {
                 if tt.token_type == TokenType::End {
-                    self.expectNext(TokenType::For);
+                    self.expectNext(TokenType::For)?;
                     break;
                 } else {
                     all_tokens.push(tt);
@@ -151,10 +203,13 @@ impl<'a> Interpreter<'a> {
         self.variables.insert(name.lexeme.lexeme.to_string(), token);
     }
 
-    fn getVariableValue(&mut self, name: Token) -> Option<&Token> {
+    fn getVariableValue(&self, name: &Token) -> Option<Token> {
         debug!("get {:?}", name);
         let name: String = name.lexeme.lexeme.to_string();
-        self.variables.get(&name)
+        match self.variables.get(&name) {
+            Some(t) => Some(t.clone()),
+            None => None
+        }
     }
 
     fn idAssign(&mut self) -> Result<(), String> {
@@ -188,28 +243,24 @@ impl<'a> Interpreter<'a> {
 
     fn print(&mut self) -> Result<(), String> {
         debug!("fn print");
-        let token = self.expectNext(TokenType::Print);
-        debug!("print {:?}", token.clone());
-        let next = self.iterator.next();
-        if let Some(token) = next {
-            let tt: TokenType = token.token_type;
-            match tt {
-                TokenType::Identifier => {
-                    match self.getVariableValue(token.clone()) {
-                        Some(var) => info!("{} => {:?}", token.lexeme.lexeme, var),
-                        None => info!("{} => None", token.lexeme.lexeme),
-                        _ => panic!(),
-                    };
+        let _ = self.expectNext(TokenType::Print)?;
 
-                }
-                TokenType::StringLiteral(hash) => {
-                    info!("{:?} => '{}'", token, self.string_cache.get(&hash).unwrap_or(&"''".to_string()));
-                }
-                TokenType::IntegerValue(x) => {
-                    info!("{}", x);
-                }
-                _ => return Err(format!("Not implemented yet")),
+        let token = self.expression(None)?;
+        let tt: TokenType = token.token_type;
+        match tt {
+            TokenType::Identifier => {
+                match self.getVariableValue(&token) {
+                    Some(var) => println!("{} => {:?}", token.lexeme.lexeme, var),
+                    None => println!("{} => None", token.lexeme.lexeme),
+                };
             }
+            TokenType::StringLiteral(hash) => {
+                println!("{:?} => '{}'", token, self.string_cache.get(&hash).unwrap_or(&"''".to_string()));
+            }
+            TokenType::IntegerValue(x) => {
+                println!("{}", x);
+            }
+            t @ _ => println!("{:?}", t),
         }
         Ok(())
     }
@@ -342,14 +393,19 @@ impl<'a> Interpreter<'a> {
 
                     let result: Token = match (t1.token_type, t2.token_type) {
                         (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(b, a, operator_token_type)?,
+                        (TokenType::Identifier, TokenType::Identifier) => {
+                            let a = self.getVariableValue(&t1).unwrap();
+                            let b = self.getVariableValue(&t2).unwrap();
+                            binary_op(&a, &b, &operator_token_type)?
+                        }
                         (TokenType::Identifier, _) => {
-                            binary_op(self.getVariableValue(t1).unwrap(),
+                            binary_op(&self.getVariableValue(&t1).unwrap(),
                                       &t2,
                                       &operator_token_type)?
                         }
                         (_, TokenType::Identifier) => {
                             binary_op(&t1,
-                                      self.getVariableValue(t2).unwrap(),
+                                      &self.getVariableValue(&t2).unwrap(),
                                       &operator_token_type)?
                         }
                         (TokenType::StringLiteral(_), TokenType::StringLiteral(_)) => {

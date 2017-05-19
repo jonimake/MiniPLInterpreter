@@ -6,6 +6,7 @@ authors = ["Joni Mäkelä <joni.makela@gmail.com>"]
 [dependencies]
 log = "0.3.7"
 simplelog = "0.4.2"
+clap = "2.22.2"
 
 [dev-dependencies]
 cargo-watch = "5.0.1"

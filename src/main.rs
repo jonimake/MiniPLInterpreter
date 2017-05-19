@@ -11,6 +11,9 @@ pub mod parser;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
+extern crate clap;
+
+use clap::{Arg, App, SubCommand};
 
 use lexeme_iterator::LexemeIterator;
 use lexeme::Lexeme;
@@ -36,6 +39,22 @@ use std::vec::Vec;
 static HAS_INIT: bool = false;
 
 fn main() {
+
+    let _ = App::new("MiniPL Interpreter")
+        .version("1.0")
+        .author("Joni M. <joni.makela@gmail.com>")
+        .about("MiniPL language interpreter")
+        .arg(Arg::with_name("INPUT")
+            .help("File to interpret")
+            .required(false)
+            .index(1))
+        .arg(Arg::with_name("log")
+            .short("l")
+            .help("Sets the level of log verbosity"))
+        .get_matches();
+
+
+
     let args = env::args().collect::<Vec<String>>();
     info!("{:?}", args);
     if args.len() > 2 {
@@ -45,7 +64,7 @@ fn main() {
             "error" => simplelog::LogLevelFilter::Error,
             "trace" => simplelog::LogLevelFilter::Trace,
             "warn" => simplelog::LogLevelFilter::Warn,
-            _ => simplelog::LogLevelFilter::Info,
+            _ => simplelog::LogLevelFilter::Error,
         };
         let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
         info!("Log level: {}", level);
@@ -54,7 +73,6 @@ fn main() {
         let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
                                             simplelog::Config::default());
     }
-
 
     info!("MiniPL Interpreter starting!");
 
@@ -87,27 +105,23 @@ fn main() {
             info!("File read");
             buffer.trim_left_matches("\u{feff}");
 
-            eval_file(&buffer);
+            let _ = eval_file(&buffer);
         }
         false => {
             //capture input and start lexemeizing that
             info!("Type commands");
             info!("Type {:?} to exit", exit_keyword);
             info!("MiniPL> ");
-            let stdin = io::stdin();
-            for line in stdin.lock().lines() {
-                match line {
-                    Ok(content) => {
-                        if content == exit_keyword {
-                            break;
-                        }
-                        eval_line(&content, &mut state, &mut string_cache);
-                    }
-                    Err(errmsg) => {
-                        error!("Error: {}", errmsg);
-                        break;
-                    }
+            loop {
+                let mut input_text: String = String::new();
+                io::stdin()
+                    .read_line(&mut input_text)
+                    .expect("failed to read from stdin");
+                if input_text.to_string().trim() == exit_keyword {
+                    break;
                 }
+                eval_line(&input_text.to_string().trim() , &mut state, &mut string_cache);
+
             }
         }
     };
@@ -121,40 +135,18 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
     let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item = Token>,
                                            &mut state,
                                            &mut string_cache);
-    //let mut interpreter = Interpreter::new(&mut state);
     interpreter.interpret()
-    //let mut peekable_iterator: Peekable<LexemeIterator> = lexeme_it.peekable();
-    //let mut tokenIterator: TokenIterator = TokenIterator{lexIter:lexeme_it};
-    //let tokens: Vec<Token> = tokenIterator.collect();
-    //let mut ast = AST::new(tokens.as_ref());
-    //ast.interpret();
-
 }
 
 fn eval_line(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
     info!("{:?}", line);
     let it = LexemeIterator::new(line);
-
-
     let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: it };
-
-    //let mut interpreter = Interpreter::new(tokenIterator);
-    //let mut state = HashMap::new();
     let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
-    //let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>, &mut state);
-    //let mut interpreter = Interpreter::new(&mut state);
     match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
         _ => {}
     }
-
-
-    //let interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item=Token>);
-    //let m: Vec<Token> = tokenIterator.collect();
-    //info!("tokens:{:?}", m);
-    //let mut ast = AST::new(m.as_ref());
-    //ast.interpret();
-
 }
 
 #[test]
@@ -172,6 +164,7 @@ print X;
 fn sample2_loop_print() {
     let code = r#"
 var nTimes : int := 0;
+print nTimes;
 print "How many times?";
 nTimes := 3;
 var x : int;
