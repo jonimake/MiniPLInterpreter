@@ -677,7 +677,7 @@ fn parse_print_complicated() {
     let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
     int.interpret();
 
-    assert!(int.getVariableValue(id).is_some());
+    assert!(int.getVariableValue(&id).is_some());
     assert!(int.iterator.count() == 0);
 }
 
