@@ -1,11 +1,7 @@
-use std::str::FromStr;
 use std::str::Lines;
-use std::cmp;
 use std::i32;
 use std::usize;
 use std::iter::Enumerate;
-use std::iter::Peekable;
-use std::str::CharIndices;
 
 use lexeme::Lexeme;
 use lexeme::LexemeType;
@@ -31,12 +27,12 @@ pub struct LexemeIterator<'a> {
 
 impl<'a> Clone for LexemeIterator<'a> {
     fn clone(&self) -> LexemeIterator<'a> {
-        let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::string_literal, is_string_literal),
-                                                                        (LexemeType::keyword, is_keyword_lexeme),
-                                                                        (LexemeType::identifier, is_identifier),
-                                                                        (LexemeType::two_char, is_two_char_lexeme),
-                                                                        (LexemeType::single_char, is_single_char_lexeme),
-                                                                        (LexemeType::integer, is_integer)];
+        let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::StringLiteral, is_string_literal),
+                                                                        (LexemeType::Keyword, is_keyword_lexeme),
+                                                                        (LexemeType::Identifier, is_identifier),
+                                                                        (LexemeType::TwoChar, is_two_char_lexeme),
+                                                                        (LexemeType::SingleChar, is_single_char_lexeme),
+                                                                        (LexemeType::Integer, is_integer)];
 
         //let l = Enumerate<Lines<'a>>
         LexemeIterator {
@@ -57,12 +53,12 @@ impl<'a> LexemeIterator<'a> {
 
     pub fn new(string: &'a str) -> LexemeIterator {
 
-        let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::string_literal, is_string_literal),
-                                                                        (LexemeType::keyword, is_keyword_lexeme),
-                                                                        (LexemeType::identifier, is_identifier),
-                                                                        (LexemeType::two_char, is_two_char_lexeme),
-                                                                        (LexemeType::single_char, is_single_char_lexeme),
-                                                                        (LexemeType::integer, is_integer)];
+        let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::StringLiteral, is_string_literal),
+                                                                        (LexemeType::Keyword, is_keyword_lexeme),
+                                                                        (LexemeType::Identifier, is_identifier),
+                                                                        (LexemeType::TwoChar, is_two_char_lexeme),
+                                                                        (LexemeType::SingleChar, is_single_char_lexeme),
+                                                                        (LexemeType::Integer, is_integer)];
         let src = string.trim_left_matches("\u{feff}"); //strip BOM
 
         let t = LexemeIterator {
@@ -85,7 +81,7 @@ impl<'a> LexemeIterator<'a> {
             //get next line chars iterator if at the end
             match self.lines.next() {
                 Some((line_number, line)) => {
-                    if (!self.initialized) {
+                    if !self.initialized {
                         self.initialized = true;
                     } else {
                         self.slice_start += 1;
@@ -102,46 +98,6 @@ impl<'a> LexemeIterator<'a> {
         }
         true
     }
-
-
-    fn visualize_line_pos(&self, pos: usize) {
-        let line1 = self.current_line;
-        let mut buffer = String::new();
-        for _ in 0..pos + 1 {
-            buffer.push(' ');
-        }
-        buffer.push('^');
-
-        println!("#####################");
-        println!("{}", line1);
-        println!("{}", buffer);
-        println!("#####################");
-    }
-
-    fn visualize_line_slice(&self, slice: &str, start: usize, end: usize) {
-        let line1 = self.current_line;
-        let mut buffer = String::new();
-        for _ in 0..start {
-            buffer.push(' ');
-        }
-        buffer.push('^');
-
-        if (end - start > 0) {
-            for _ in 0..(end - start - 1) {
-                buffer.push(' ');
-            }
-
-            buffer.push('^');
-        }
-
-        println!("#####################");
-
-        println!("slice: \t{}", slice);
-        println!("line: \t{}", line1);
-        println!("      \t{}", buffer);
-        println!("{}-{}", start, end);
-        println!("#####################");
-    }
 }
 
 impl<'a> Iterator for LexemeIterator<'a> {
@@ -154,7 +110,7 @@ impl<'a> Iterator for LexemeIterator<'a> {
             return lexeme;
         }
 
-        let mut lexemeStr = "";
+        let mut lexeme_str = "";
         let mut lexeme_candidate;
         let mut found = false;
         let mut skipped_initial_whitespace = false;
@@ -182,21 +138,21 @@ impl<'a> Iterator for LexemeIterator<'a> {
                 skipping_whitespace = true;
                 self.current_line_char_pos += 1;
                 continue;
-            } else if (skipping_whitespace && lexeme_candidate != " ") {
+            } else if skipping_whitespace && lexeme_candidate != " " {
                 skipped_initial_whitespace = true;
             }
 
             for tuple_ref in self.lexeme_matchers.iter() {
                 let (lexemetype, matcher_fn): (LexemeType, fn(&str) -> bool) = *tuple_ref;
-                if (matcher_fn(lexeme_candidate)) {
+                if matcher_fn(lexeme_candidate) {
                     let line_pos_start = self.current_line_char_pos;
                     //let line_pos_end = self.current_line_char_pos + lexeme_candidate.len();
                     let lexeme_length = lexeme_candidate.chars().count();
-                    if (lexeme_length > longest_lexeme) {
+                    if lexeme_length > longest_lexeme {
                         //prioritize length
                         //println!("New longest lexeme {:?}, {:?}, {:?}", lexeme_candidate ,lexemetype, lexeme_length);
                         longest_lexeme = lexeme_length;
-                        lexemeStr = lexeme_candidate;
+                        lexeme_str = lexeme_candidate;
 
                         t_end = column;
                         lexeme_start_on_line = line_pos_start;
@@ -211,7 +167,7 @@ impl<'a> Iterator for LexemeIterator<'a> {
             lexeme = Some(Lexeme {
                               line: self.current_line_number + 1,
                               column: lexeme_start_on_line + 1,
-                              lexeme: lexemeStr.to_string(),
+                              lexeme: lexeme_str.to_string(),
                               lexeme_type: lexeme_type,
                           });
 
@@ -248,7 +204,7 @@ fn is_string_literal(lexeme: &str) -> bool {
         match ch {
             '\\' => escape_next = true,
             '"' => {
-                if (!escape_next) {
+                if !escape_next {
                     num_unescaped_quotes += 1;
                 }
             }
@@ -264,11 +220,11 @@ fn is_integer(lexeme: &str) -> bool {
 }
 
 fn is_identifier(lexeme: &str) -> bool {
-    let allAreAlphaNum = lexeme
+    let all_are_alpha_num = lexeme
         .chars()
         .all(|ch: char| ch.is_alphanumeric() || ch == '_');
-    let firstIsAlphabetic = lexeme.chars().nth(0).unwrap_or('1').is_alphabetic();
-    firstIsAlphabetic && allAreAlphaNum
+    let first_is_alphabetic = lexeme.chars().nth(0).unwrap_or('1').is_alphabetic();
+    first_is_alphabetic && all_are_alpha_num
 }
 
 
@@ -315,63 +271,63 @@ fn lexemeize_integer_assignment() -> () {
                         line: 1,
                         column: 1,
                         lexeme: "var".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 5,
                         lexeme: "x".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 7,
                         lexeme: ":".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 9,
                         lexeme: "int".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 13,
                         lexeme: ":=".to_string(),
-                        lexeme_type: LexemeType::two_char,
+                        lexeme_type: LexemeType::TwoChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 15,
                         lexeme: "4".to_string(),
-                        lexeme_type: LexemeType::integer,
+                        lexeme_type: LexemeType::Integer,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 16,
                         lexeme: "-".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 17,
                         lexeme: "2".to_string(),
-                        lexeme_type: LexemeType::integer,
+                        lexeme_type: LexemeType::Integer,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 18,
                         lexeme: ";".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
 }
@@ -385,14 +341,14 @@ fn lexemeize_two_consecutive() -> () {
                         line: 1,
                         column: 1,
                         lexeme: "var".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 5,
                         lexeme: "X".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
 }
@@ -406,35 +362,35 @@ fn lexemeize_two_consecutive_file_3() -> () {
                         line: 1,
                         column: 1,
                         lexeme: "print".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 7,
                         lexeme: "\"Give a number\"".to_string(),
-                        lexeme_type: LexemeType::string_literal,
+                        lexeme_type: LexemeType::StringLiteral,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 22,
                         lexeme: ";".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 2,
                         column: 1,
                         lexeme: "var".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 2,
                         column: 5,
                         lexeme: "n".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
 }
@@ -448,35 +404,35 @@ fn lexemeize_full_line() -> () {
                         line: 1,
                         column: 1,
                         lexeme: "var".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 5,
                         lexeme: "X".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 7,
                         lexeme: ":".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 9,
                         lexeme: "int".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 12,
                         lexeme: ";".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
 }
@@ -495,49 +451,49 @@ fn lexemeize_multiple_lines() -> () {
                         line: 2,
                         column: 1,
                         lexeme: "X".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 2,
                         column: 3,
                         lexeme: ":=".to_string(),
-                        lexeme_type: LexemeType::two_char,
+                        lexeme_type: LexemeType::TwoChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 2,
                         column: 6,
                         lexeme: "15".to_string(),
-                        lexeme_type: LexemeType::integer,
+                        lexeme_type: LexemeType::Integer,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 2,
                         column: 8,
                         lexeme: ";".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 3,
                         column: 1,
                         lexeme: "print".to_string(),
-                        lexeme_type: LexemeType::keyword,
+                        lexeme_type: LexemeType::Keyword,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 3,
                         column: 7,
                         lexeme: "X".to_string(),
-                        lexeme_type: LexemeType::identifier,
+                        lexeme_type: LexemeType::Identifier,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 3,
                         column: 8,
                         lexeme: ";".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
 }
@@ -551,21 +507,21 @@ fn recorgnize_expression() -> () {
                         line: 1,
                         column: 1,
                         lexeme: "1".to_string(),
-                        lexeme_type: LexemeType::integer,
+                        lexeme_type: LexemeType::Integer,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 2,
                         lexeme: "+".to_string(),
-                        lexeme_type: LexemeType::single_char,
+                        lexeme_type: LexemeType::SingleChar,
                     }),
                iterator.next());
     assert_eq!(Some(Lexeme {
                         line: 1,
                         column: 3,
                         lexeme: "1".to_string(),
-                        lexeme_type: LexemeType::integer,
+                        lexeme_type: LexemeType::Integer,
                     }),
                iterator.next());
 }

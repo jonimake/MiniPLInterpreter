@@ -18,7 +18,7 @@ impl Token {
         }
     }
 
-    pub fn newString(tt: TokenType, l: &str) -> Token {
+    pub fn new_string(tt: TokenType, l: &str) -> Token {
         let mut lexeme = Lexeme::default();
         lexeme.lexeme = l.to_string();
         Token {

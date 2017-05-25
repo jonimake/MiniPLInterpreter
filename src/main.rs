@@ -1,8 +1,8 @@
-#![allow(unused_parens)]
-#![allow(unused_imports)]
-#![allow(dead_code)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
+//#![allow(unused_parens)]
+//#![allow(unused_imports)]
+//#![allow(dead_code)]
+//#![allow(non_camel_case_types)]
+//#![allow(non_snake_case)]
 
 pub mod lexeme;
 pub mod lexeme_iterator;
@@ -13,30 +13,21 @@ extern crate log;
 extern crate simplelog;
 extern crate clap;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 
 use lexeme_iterator::LexemeIterator;
-use lexeme::Lexeme;
 use parser::token::Token;
 use parser::token_iterator::TokenIterator;
 use parser::interpreter::Interpreter;
-//use parser::Token;
 
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::io::BufReader;
-use std::str::SplitWhitespace;
-use std::iter::Peekable;
 use std::env;
-use std::path::PathBuf;
 use std::io;
 use std::collections::HashMap;
 use std::vec::Vec;
-
-
-static HAS_INIT: bool = false;
 
 fn main() {
 
@@ -76,12 +67,12 @@ fn main() {
 
     info!("MiniPL Interpreter starting!");
 
-    let mut pathStr: &str = "";
+    let mut path_str: &str = "";
     if args.len() > 1 {
-        pathStr = &args[1];
+        path_str = &args[1];
     }
 
-    let path = Path::new(pathStr);
+    let path = Path::new(path_str);
 
     let mut absolute_path = env::current_dir().unwrap();
     let mut state: HashMap<String, Token> = HashMap::new();
@@ -131,8 +122,8 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
     let mut state = HashMap::new();
     let mut string_cache = HashMap::new();
     let lexeme_it = LexemeIterator::new(file_contents);
-    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: lexeme_it };
-    let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item = Token>,
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: lexeme_it };
+    let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>,
                                            &mut state,
                                            &mut string_cache);
     interpreter.interpret()
@@ -141,8 +132,8 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
 fn eval_line(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
     info!("{:?}", line);
     let it = LexemeIterator::new(line);
-    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: it };
-    let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: it };
+    let mut interpreter = Interpreter::new(&mut token_iterator, &mut state, &mut string_cache);
     match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
         _ => {}

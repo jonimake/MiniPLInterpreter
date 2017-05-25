@@ -1,5 +1,5 @@
 [root]
-name = "MiniPLInterpreter"
+name = "mini_pli_interpreter"
 version = "0.1.0"
 dependencies = [
  "cargo-watch 5.0.1 (registry+https://github.com/rust-lang/crates.io-index)",

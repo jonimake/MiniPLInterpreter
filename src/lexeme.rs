@@ -32,12 +32,12 @@ impl fmt::Display for Lexeme {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LexemeType {
-    single_char,
-    two_char,
-    keyword,
-    integer,
-    string_literal,
-    identifier,
+    SingleChar,
+    TwoChar,
+    Keyword,
+    Integer,
+    StringLiteral,
+    Identifier,
     NA,
 }
 

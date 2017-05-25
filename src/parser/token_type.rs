@@ -1,7 +1,5 @@
 use std::fmt;
 
-use lexeme::Lexeme;
-
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TokenType {
     Identifier,
