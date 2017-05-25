@@ -14,22 +14,28 @@ pub struct InterpreterState {
     pub string_cache: HashMap<u64, String>,
 }
 
-pub struct Interpreter<'a> {
-    pub variables: &'a mut HashMap<String, Token>,
+impl InterpreterState {
+    pub fn new() -> InterpreterState {
+        InterpreterState {
+            variables: HashMap::new(),
+            string_cache: HashMap::new()
+        }
+    }
+}
+
+pub struct Interpreter<'a, 'b:'a> {
+    interpreter_state: &'b mut InterpreterState,
     iterator: Peekable<TokenIteratorType<'a>>,
-    string_cache: &'a mut HashMap<u64, String>,
 
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     pub fn new(iter: TokenIteratorType<'a>,
-               state: &'a mut HashMap<String, Token>,
-               string_cache: &'a mut HashMap<u64, String>)
-               -> Interpreter<'a> {
+               state: &'b mut InterpreterState)
+               -> Interpreter<'a, 'b> {
         Interpreter {
-            variables: state,
-            iterator: iter.peekable(),
-            string_cache: string_cache,
+            interpreter_state: state,
+            iterator: iter.peekable()
         }
     }
 
@@ -172,8 +178,7 @@ impl<'a> Interpreter<'a> {
                     self.set_variable_value(loop_id.clone(),
                                             Token::new(TokenType::IntegerValue(x), Lexeme::default()));
                     let mut int = Interpreter::new(&mut token_iter as &mut Iterator<Item = Token>,
-                                                   &mut self.variables,
-                                                   &mut self.string_cache);
+                                                   &mut self.interpreter_state);
                     int.interpret()?;
                 }
             }
@@ -186,13 +191,13 @@ impl<'a> Interpreter<'a> {
     fn set_variable_value(&mut self, name: Token, token: Token) {
         debug!("{:?} => {:?}", name.lexeme.lexeme, token);
 
-        self.variables.insert(name.lexeme.lexeme.to_string(), token);
+        self.interpreter_state.variables.insert(name.lexeme.lexeme.to_string(), token);
     }
 
     fn get_variable_value(&self, name: &Token) -> Option<Token> {
         debug!("get {:?}", name);
         let name: String = name.lexeme.lexeme.to_string();
-        match self.variables.get(&name) {
+        match self.interpreter_state.variables.get(&name) {
             Some(t) => Some(t.clone()),
             None => None
         }
@@ -241,7 +246,7 @@ impl<'a> Interpreter<'a> {
                 };
             }
             TokenType::StringLiteral(hash) => {
-                println!("{:?} => '{}'", token, self.string_cache.get(&hash).unwrap_or(&"''".to_string()));
+                println!("{:?} => '{}'", token, self.interpreter_state.string_cache.get(&hash).unwrap_or(&"''".to_string()));
             }
             TokenType::IntegerValue(x) => {
                 println!("{}", x);
@@ -468,9 +473,8 @@ fn evaluate_postfix_simple_addition() {
                                       Token::new_string(TokenType::Addition, "+")];
 
     let mut iter = vec![].into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
 
     let res = int.evaluate_postfix(&mut tokens);
     assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(3));
@@ -489,9 +493,8 @@ fn evaluate_postfix_complex() {
                                       Token::new_string(TokenType::IntegerValue(3), "3"),
                                       Token::new_string(TokenType::Subtraction, "-")];
     let mut iter = vec![].into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let res = int.evaluate_postfix(&mut tokens);
     assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(14));
 }
@@ -509,12 +512,11 @@ fn parse_var_definition() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
-    assert!(int.variables.contains_key("x"));
-    assert_eq!(int.variables.get("x"), Some(&val));
+    assert!(int.interpreter_state.variables.contains_key("x"));
+    assert_eq!(int.interpreter_state.variables.get("x"), Some(&val));
 }
 
 #[test]
@@ -528,9 +530,8 @@ fn parse_var_definition_2() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
 }
 
@@ -546,12 +547,11 @@ fn parse_var_declaration() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
-    assert!(int.variables.contains_key("x"));
-    assert_eq!(int.variables.get("x"), Some(&tokentype));
+    assert!(int.interpreter_state.variables.contains_key("x"));
+    assert_eq!(int.interpreter_state.variables.get("x"), Some(&tokentype));
 }
 
 #[test]
@@ -564,9 +564,8 @@ fn parse_print_string_integer() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
     assert!(int.iterator.count() == 0);
 }
@@ -581,10 +580,8 @@ fn parse_print_string_literal() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
 
     assert!(int.iterator.count() == 0);
@@ -607,10 +604,8 @@ fn parse_print_complicated() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
 
     assert!(int.get_variable_value(&id).is_some());
@@ -626,9 +621,8 @@ fn parse_expression_1() {
                                   Token::new_string(TokenType::IntegerValue(1), "1")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
     debug!("{:?}", result);
     assert_eq!(result.unwrap(),
@@ -646,9 +640,8 @@ fn parse_assert() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.assert().unwrap();
 }
 
@@ -659,9 +652,8 @@ fn evaluate_postfix_equality() {
                                       Token::new_string(TokenType::Equal, "=")];
 
     let mut iter = vec![].into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.evaluate_postfix(&mut tokens).unwrap();
 }
 
@@ -674,9 +666,8 @@ fn parse_expression_2() {
                                   Token::new_string(TokenType::IntegerValue(1), "1")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
     debug!("{:?}", result);
     assert_eq!(result.unwrap(),
@@ -699,12 +690,11 @@ fn parse_var_definition_expression_1() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
-    assert!(int.variables.contains_key("x"));
-    assert_eq!(int.variables.get("x"),
+    assert!(int.interpreter_state.variables.contains_key("x"));
+    assert_eq!(int.interpreter_state.variables.get("x"),
                Some(&Token::new_string(TokenType::IntegerValue(2), "")));
 }
 
@@ -734,12 +724,11 @@ fn parse_var_definition_expression_2() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
-    assert!(int.variables.contains_key("x"));
-    assert_eq!(int.variables.get("x"),
+    assert!(int.interpreter_state.variables.contains_key("x"));
+    assert_eq!(int.interpreter_state.variables.get("x"),
                Some(&Token::new_string(TokenType::IntegerValue(9), "")));
 }
 
@@ -762,13 +751,12 @@ fn parse_var_definition_expression_3() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     assert!(int.interpret().is_ok());
-    assert!(int.variables.contains_key("x"));
-    let expected_value = Token::new_string(TokenType::IntegerValue(12), "12");
-    assert_eq!(int.variables.get("x"), Some(&expected_value));
+    assert!(int.interpreter_state.variables.contains_key("x"));
+    let expected_value = Token::new_string(TokenType::IntegerValue(16), "");
+    assert_eq!(int.interpreter_state.variables.get("x"), Some(&expected_value));
 }
 
 
@@ -785,9 +773,8 @@ fn parse_expression_3() {
                                   Token::new_string(TokenType::IntegerValue(4), "4")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
-    let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+    let mut state = InterpreterState::new();
+    let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
     println!("result = {:?}", result);
     let expected_value = Token::new_string(TokenType::IntegerValue(16), "");
@@ -811,14 +798,13 @@ fn parse_expression_4() {
                                   Token::new_string(TokenType::StatementEnd, ";")];
 
     let mut iter = tokens.into_iter();
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
+    let mut state = InterpreterState::new();
     {
-        let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+        let mut int = Interpreter::new(&mut iter, &mut state);
         int.interpret();
     }
 
-    assert_eq!(state.get("x"),
+    assert_eq!(state.variables.get("x"),
                Some(&Token::new_string(TokenType::IntegerValue(7), "")));
 }
 
@@ -848,21 +834,20 @@ fn stateful_var_definition() {
                                    Token::new_string(TokenType::StatementEnd, ";")];
 
 
-    let mut state = HashMap::new();
-    let mut strings = HashMap::new();
+    let mut state = InterpreterState::new();
     {
         let mut iter = tokens1.into_iter();
-        let mut int = Interpreter::new(&mut iter, &mut state, &mut strings);
+        let mut int = Interpreter::new(&mut iter, &mut state);
         let _ = int.interpret();
     }
     {
         let mut iter = tokens2.into_iter();
-        let mut int2 = Interpreter::new(&mut iter, &mut state, &mut strings);
+        let mut int2 = Interpreter::new(&mut iter, &mut state);
         let _ = int2.interpret();
     }
 
 
-    assert!(state.contains_key("x"));
-    assert_eq!(state.get("x"),
+    assert!(state.variables.contains_key("x"));
+    assert_eq!(state.variables.get("x"),
                Some(&Token::new_string(TokenType::IntegerValue(1), "1")));
 }
