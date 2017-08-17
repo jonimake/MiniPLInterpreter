@@ -7,7 +7,7 @@ use std::result::Result;
 
 use parser::token::Token;
 use parser::token_type::TokenType;
-use lexeme::Lexeme;
+use lexer::lexeme::Lexeme;
 
 type TokenIteratorType<'a> = &'a mut Iterator<Item = Token>;
 

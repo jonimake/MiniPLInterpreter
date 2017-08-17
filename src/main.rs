@@ -1,5 +1,4 @@
-pub mod lexeme;
-pub mod lexeme_iterator;
+pub mod lexer;
 pub mod parser;
 
 #[macro_use]
@@ -9,7 +8,7 @@ extern crate clap;
 
 use clap::{Arg, App};
 
-use lexeme_iterator::LexemeIterator;
+use lexer::lexeme_iterator::LexemeIterator;
 use parser::token::Token;
 use parser::token_iterator::TokenIterator;
 use parser::interpreter::Interpreter;
@@ -172,6 +171,18 @@ fn sample4_decl_assign_print() {
                                         simplelog::Config::default());
     let code = r#"
 var X : int;
+X := 15;
+print X;
+"#;
+    eval_file(code).unwrap();
+}
+
+#[test]
+fn test_decl_assign_boolean() {
+    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
+                                        simplelog::Config::default());
+    let code = r#"
+var X : bool;
 X := 15;
 print X;
 "#;

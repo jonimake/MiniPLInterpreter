@@ -3,9 +3,9 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::collections::hash_map::DefaultHasher;
 
-use lexeme::Lexeme;
-use lexeme::LexemeType;
-use lexeme_iterator::LexemeIterator;
+use lexer::lexeme::Lexeme;
+use lexer::lexeme::LexemeType;
+use lexer::lexeme_iterator::LexemeIterator;
 use parser::token::Token;
 use parser::token_type::TokenType;
 

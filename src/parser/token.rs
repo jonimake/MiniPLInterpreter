@@ -1,4 +1,4 @@
-use lexeme::Lexeme;
+use lexer::lexeme::Lexeme;
 use parser::token_type::TokenType;
 
 use std::fmt;

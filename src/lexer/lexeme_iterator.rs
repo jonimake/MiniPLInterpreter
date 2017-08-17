@@ -3,8 +3,8 @@ use std::i32;
 use std::usize;
 use std::iter::Enumerate;
 
-use lexeme::Lexeme;
-use lexeme::LexemeType;
+use super::lexeme::Lexeme;
+use super::lexeme::LexemeType;
 
 const SINGLE_CHAR_LEXEME: &'static [&'static str] = &["+", "-", "*", "/", "<", "=", "&", "!", "(", ")", ";", ".", ":"];
 const TWO_CHAR_LEXEME: &'static [&'static str] = &["..", ":="];
