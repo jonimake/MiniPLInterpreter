@@ -160,7 +160,7 @@ for x in 0..nTimes-1 do
 end for;
 print x;
 print nTimes;
-assert (x = nTimes);
+assert (x = (nTimes-1));
 "#;
     eval_file(code).unwrap();
 }
