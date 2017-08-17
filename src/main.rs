@@ -1,9 +1,3 @@
-//#![allow(unused_parens)]
-//#![allow(unused_imports)]
-//#![allow(dead_code)]
-//#![allow(non_camel_case_types)]
-//#![allow(non_snake_case)]
-
 pub mod lexeme;
 pub mod lexeme_iterator;
 pub mod parser;
@@ -43,7 +37,6 @@ fn main() {
             .short("l")
             .help("Sets the level of log verbosity"))
         .get_matches();
-
 
 
     let args = env::args().collect::<Vec<String>>();
@@ -138,6 +131,8 @@ fn eval_line(line: &str, mut state: &mut InterpreterState) {
 
 #[test]
 fn sample1_var_definition_expression_print() {
+    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
+                                        simplelog::Config::default());
     let code = r#"
 var X : int := 4 + (6 * 2);
 print X;
@@ -149,16 +144,22 @@ print X;
 
 #[test]
 fn sample2_loop_print() {
+    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Debug,
+                                        simplelog::Config::default());
+
     let code = r#"
 var nTimes : int := 0;
 print nTimes;
 print "How many times?";
 nTimes := 3;
+print nTimes;
 var x : int;
 for x in 0..nTimes-1 do
 	print x;
 	print " : Hello, World!\n";
 end for;
+print x;
+print nTimes;
 assert (x = nTimes);
 "#;
     eval_file(code).unwrap();
@@ -167,6 +168,8 @@ assert (x = nTimes);
 
 #[test]
 fn sample4_decl_assign_print() {
+    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
+                                        simplelog::Config::default());
     let code = r#"
 var X : int;
 X := 15;
