@@ -101,14 +101,20 @@ fn get_single_char_token(lx: Lexeme) -> Result<Token, String> {
 
 #[derive(Clone)]
 pub struct TokenIterator<I>
-    where I: Iterator<Item = Lexeme>
-{
-    pub lex_iter: I,
+    where I: Iterator<Item = Lexeme> {
+    lex_iter: I,
+}
+
+impl<'a, I> TokenIterator<I> where I: Iterator<Item = Lexeme> {
+    pub fn new(it: I) -> TokenIterator<I> {
+        TokenIterator {
+            lex_iter: it
+        }
+    }
 }
 
 impl<'a, I> Iterator for TokenIterator<I>
-    where I: Iterator<Item = Lexeme>
-{
+    where I: Iterator<Item = Lexeme> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {

@@ -141,7 +141,7 @@ fn main() {
 
 fn eval_file(file_contents: &str) -> Result<(), String> {
     let lexeme_it = LexemeIterator::new(file_contents);
-    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: lexeme_it };
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(lexeme_it);
     let mut state = InterpreterState::new();
     let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>,
                                            &mut state);
@@ -151,7 +151,7 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
 fn eval_line(line: &str, mut state: &mut InterpreterState) {
     info!("{:?}", line);
     let it = LexemeIterator::new(line);
-    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: it };
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(it);
     let mut interpreter = Interpreter::new(&mut token_iterator, &mut state);
     match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
