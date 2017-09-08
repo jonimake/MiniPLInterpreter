@@ -184,13 +184,15 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     }
 
     fn set_variable_value(&mut self, name: Token, token: Token) {
-        debug!("set {:?} => {}", name.lexeme.lexeme, token);
-        self.interpreter_state.variables.insert(name.lexeme.lexeme.to_string(), token);
+        let name_lexeme = name.lexeme.unwrap();
+        debug!("set {:?} => {}", name_lexeme.lexeme, token);
+        self.interpreter_state.variables.insert(name_lexeme.lexeme.to_string(), token);
     }
 
     fn get_variable_value(&self, name: &Token) -> Option<Token> {
 
-        let name: String = name.lexeme.lexeme.to_string();
+        let name_lexeme = name.clone().lexeme.unwrap();
+        let name: String = name_lexeme.lexeme.to_string();
         match self.interpreter_state.variables.get(&name) {
             Some(t) => {
                 trace!("get {:?} = {:?}", name, t.clone());
@@ -237,8 +239,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         match tt {
             TokenType::Identifier => {
                 match self.get_variable_value(&token) {
-                    Some(var) => println!("{} => {:?}", token.lexeme.lexeme, var),
-                    None => println!("{} => None", token.lexeme.lexeme),
+                    Some(var) => println!("{} => {:?}", token.lexeme.unwrap().lexeme, var),
+                    None => println!("{} => None", token.lexeme.unwrap().lexeme),
                 };
             }
             TokenType::StringLiteral(hash) => {
@@ -497,7 +499,7 @@ fn for_loop_test() {
     let foo: Result<(), String> = int.for_loop();
     assert_eq!(Ok(()), foo);
     assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token{token_type: TokenType::IntegerValue(3), lexeme: Lexeme::default()}));
+               Some(&Token{token_type: TokenType::IntegerValue(3), lexeme: Some(Lexeme::default())}));
 }
 
 #[test]
@@ -552,7 +554,7 @@ fn for_loop_assert_test() {
     println!("{:?}", int.interpreter_state.variables);
     assert_eq!(Ok(()), foo);
     assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token{token_type: TokenType::IntegerValue(2), lexeme: Lexeme::default()}));
+               Some(&Token{token_type: TokenType::IntegerValue(2), lexeme: Some(Lexeme::default())}));
 }
 
 

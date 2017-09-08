@@ -7,14 +7,14 @@ use std::fmt;
 #[derive(PartialEq, Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
-    pub lexeme: Lexeme,
+    pub lexeme: Option<Lexeme>,
 }
 
 impl Token {
     pub fn new(tt: TokenType, l: Lexeme) -> Token {
         Token {
             token_type: tt,
-            lexeme: l,
+            lexeme: Some(l),
         }
     }
 
@@ -23,7 +23,7 @@ impl Token {
         lexeme.lexeme = l.to_string();
         Token {
             token_type: tt,
-            lexeme: lexeme,
+            lexeme: Some(lexeme),
         }
     }
 }
@@ -33,7 +33,7 @@ impl Default for Token {
     fn default() -> Token {
         Token {
             token_type: TokenType::EOF,
-            lexeme: Lexeme::default(),
+            lexeme: None,
         }
     }
 }
