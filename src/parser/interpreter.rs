@@ -1,5 +1,3 @@
-use simplelog;
-
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::vec::Vec;
@@ -29,7 +27,6 @@ impl InterpreterState {
 pub struct Interpreter<'a, 'b:'a> {
     interpreter_state: &'b mut InterpreterState,
     iterator: Peekable<TokenIteratorType<'a>>,
-
 }
 
 impl<'a, 'b: 'a> Interpreter<'a, 'b> {
@@ -167,6 +164,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         match (range_start, range_end) {
             (Token { token_type: TokenType::IntegerValue(start_int), .. }, Token { token_type: TokenType::IntegerValue(end_int), .. }) => {
                 for x in start_int..end_int+1 {
+                    trace!("loop {}", x);
                     let mut token_iter = all_tokens.clone().into_iter();
                     //not sure if doing something incredibly dirty
                     self.set_variable_value(loop_id.clone(),
@@ -186,7 +184,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     }
 
     fn set_variable_value(&mut self, name: Token, token: Token) {
-        println!("set {:?} => {:?}", name.lexeme.lexeme, token);
+        debug!("set {:?} => {}", name.lexeme.lexeme, token);
         self.interpreter_state.variables.insert(name.lexeme.lexeme.to_string(), token);
     }
 
@@ -244,12 +242,9 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                 };
             }
             TokenType::StringLiteral(hash) => {
-                println!("{:?} => '{}'", token, self.interpreter_state.string_cache.get(&hash).unwrap_or(&"''".to_string()));
+                println!("{}", self.interpreter_state.string_cache.get(&hash).unwrap_or(&"''".to_string()));
             }
-            TokenType::IntegerValue(x) => {
-                println!("{}", x);
-            }
-            t @ _ => println!("{:?}", t),
+            t @ _ => println!("{}", t),
         }
         Ok(())
     }
@@ -346,7 +341,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     }
 
 
-    fn evaluate_postfix(&mut self, mut tokens: &mut Vec<Token>) -> Result<Token, String> {
+    fn evaluate_postfix(&mut self, tokens: &mut Vec<Token>) -> Result<Token, String> {
         let mut stack: Vec<Token> = Vec::new();
 
         trace!("eval tokens {:?}", tokens.clone());
@@ -392,6 +387,14 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                         (TokenType::StringLiteral(_), TokenType::StringLiteral(_)) => {
                             Token::new(TokenType::StringLiteral(0), Lexeme::default())
                         }
+                        (TokenType::BooleanValue(a), TokenType::BooleanValue(b)) => {
+                            match operator_token_type {
+                                TokenType::Equal => {
+                                    Token::new(TokenType::BooleanValue(a == b), Lexeme::default())
+                                }
+                                _ => return Err(format!("Only equality is implemented for boolean tokens"))
+                            }
+                        }
                         _ => return Err(format!("Unimplemented for tokens {:?} and {:?}", t1, t2)),
                     };
                     stack.push(result);
@@ -401,6 +404,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             }
         }
         if stack.len() != 1 {
+            error!("Stack: {:?}", stack);
             panic!("Stack length wasn't 1, error occurred");
         } else {
             let result = Ok(stack[0].clone());
@@ -504,9 +508,6 @@ fn for_loop_assert_test() {
     //end for;
     //assert (x = nTimes);
 
-    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Trace,
-                                        simplelog::Config::default());
-
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::VarKeyword, "var"),
         Token::new_string(TokenType::Identifier, "nTimes"),
@@ -531,16 +532,19 @@ fn for_loop_assert_test() {
         Token::new_string(TokenType::StatementEnd, ";"),
         Token::new_string(TokenType::End, "end"),
         Token::new_string(TokenType::For, "for"),
-        Token::new_string(TokenType::StatementEnd, ";")];
-/*
+        Token::new_string(TokenType::StatementEnd, ";"),
+
         Token::new_string(TokenType::Assert, "assert"),
         Token::new_string(TokenType::LParen, "("),
         Token::new_string(TokenType::Identifier, "x"),
         Token::new_string(TokenType::Equal, "="),
+        Token::new_string(TokenType::LParen, "(",),
         Token::new_string(TokenType::Identifier, "nTimes"),
+        Token::new_string(TokenType::Subtraction, "-"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
         Token::new_string(TokenType::RParen, ")"),
         Token::new_string(TokenType::StatementEnd, ";")];
-*/
+
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
@@ -748,7 +752,8 @@ fn parse_assert_identifier() {
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
-    let result = int.interpret().unwrap();
+    int.interpret().unwrap()
+    //let result = int.interpret().unwrap();
 }
 
 #[test]

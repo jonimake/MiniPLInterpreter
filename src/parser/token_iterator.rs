@@ -14,6 +14,7 @@ fn get_token(lx: Lexeme) -> Result<Token, String> {
         Lexeme { lexeme_type: LexemeType::SingleChar, .. } => get_single_char_token(lx),
         Lexeme { lexeme_type: LexemeType::TwoChar, .. } => get_two_char_token(lx),
         Lexeme { lexeme_type: LexemeType::Keyword, .. } => get_keyword_token(lx),
+        Lexeme { lexeme_type: LexemeType::Bool, .. } => get_bool_token(lx),
         Lexeme { lexeme_type: LexemeType::Integer, .. } => get_integer_token(lx),
         Lexeme { lexeme_type: LexemeType::Identifier, .. } => get_identifier_token(lx),
         Lexeme { lexeme_type: LexemeType::StringLiteral, .. } => get_string_literal_token(lx),
@@ -45,6 +46,17 @@ fn get_integer_token(lx: Lexeme) -> Result<Token, String> {
                lexeme: lx,
                token_type: TokenType::IntegerValue(value),
            })
+    } else {
+        Err(format!("Invalid token:{:?}", lx))
+    }
+}
+
+fn get_bool_token(lx: Lexeme) -> Result<Token, String> {
+    if let Ok(value) = lx.lexeme.parse::<bool>() {
+        Ok(Token {
+            lexeme: lx,
+            token_type: TokenType::BooleanValue(value)
+        })
     } else {
         Err(format!("Invalid token:{:?}", lx))
     }

@@ -49,7 +49,7 @@ impl fmt::Display for TokenType {
         match *self {
             TokenType::IntegerValue(integer) => write!(f, "{}", integer),
             TokenType::BooleanValue(boolean) => write!(f, "{}", boolean),
-            _ => write!(f, "{}", "unimplemented"),
+            _ => write!(f, "{:?}", self),
         }
     }
 }

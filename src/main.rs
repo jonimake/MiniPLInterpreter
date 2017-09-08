@@ -1,12 +1,15 @@
 pub mod lexer;
 pub mod parser;
 
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate simplelog;
-extern crate clap;
+extern crate structopt;
+#[macro_use] extern crate structopt_derive;
 
-use clap::{Arg, App};
+use simplelog::LogLevelFilter;
+use simplelog::Config;
+use simplelog::TermLogger;
+use structopt::StructOpt;
 
 use lexer::lexeme_iterator::LexemeIterator;
 use parser::token::Token;
@@ -20,51 +23,79 @@ use std::path::Path;
 use std::io::BufReader;
 use std::env;
 use std::io;
-use std::vec::Vec;
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "MiniPLInterpreter")]
+struct Cli {
+    #[structopt(long = "inputpath", short = "i",
+    help="Path to file to be interpreted. If left empty, the program will wait for stdin to be interpreted.")]
+    input_path: Option<String>,
+
+    #[structopt(long = "loglevel", short="l")]
+    log_level: Option<LogLevel>
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "loglevel")]
+enum LogLevel {
+    #[structopt(name = "error")]
+    Error,
+    #[structopt(name = "info")]
+    Info,
+    #[structopt(name = "warning")]
+    Warning,
+    #[structopt(name = "debug")]
+    Debug,
+    #[structopt(name = "trace")]
+    Trace,
+}
+
+impl std::str::FromStr for LogLevel {
+    type Err = std::string::ParseError;
+
+    fn from_str(text: &str) -> std::result::Result<Self, Self::Err> {
+        match text {
+
+            "info" => Result::Ok(LogLevel::Info),
+            "warning" => Result::Ok(LogLevel::Warning),
+            "debug" => Result::Ok(LogLevel::Debug),
+            "trace" => Result::Ok(LogLevel::Trace),
+            "error" => Result::Ok(LogLevel::Error),
+            _ => Result::Ok(LogLevel::Error)
+        }
+    }
+}
+
+impl Into<LogLevelFilter> for LogLevel {
+    fn into(self) -> LogLevelFilter {
+        match self {
+            LogLevel::Error => LogLevelFilter::Error,
+            LogLevel::Info  => LogLevelFilter::Info,
+            LogLevel::Warning  => LogLevelFilter::Warn,
+            LogLevel::Debug => LogLevelFilter::Debug,
+            LogLevel::Trace => LogLevelFilter::Trace
+        }
+    }
+}
 
 fn main() {
 
-    let _ = App::new("MiniPL Interpreter")
-        .version("1.0")
-        .author("Joni M. <joni.makela@gmail.com>")
-        .about("MiniPL language interpreter")
-        .arg(Arg::with_name("INPUT")
-            .help("File to interpret")
-            .required(false)
-            .index(1))
-        .arg(Arg::with_name("log")
-            .short("l")
-            .help("Sets the level of log verbosity"))
-        .get_matches();
-
-
-    let args = env::args().collect::<Vec<String>>();
-    info!("{:?}", args);
-    if args.len() > 2 {
-        let level: simplelog::LogLevelFilter = match args[2].as_ref() {
-            "info" => simplelog::LogLevelFilter::Info,
-            "debug" => simplelog::LogLevelFilter::Debug,
-            "error" => simplelog::LogLevelFilter::Error,
-            "trace" => simplelog::LogLevelFilter::Trace,
-            "warn" => simplelog::LogLevelFilter::Warn,
-            _ => simplelog::LogLevelFilter::Error,
-        };
-        let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
-        info!("Log level: {}", level);
-
-    } else {
-        let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
-                                            simplelog::Config::default());
-    }
+    let args = Cli::from_args();
+    let ll = args.log_level;
+    let level_filter: LogLevelFilter = match ll {
+        Some(level) => {
+            level.into()
+        },
+        _ => {
+            LogLevelFilter::Error
+        }
+    };
+    let _ = TermLogger::init(level_filter, Config::default());
 
     info!("MiniPL Interpreter starting!");
 
-    let mut path_str: &str = "";
-    if args.len() > 1 {
-        path_str = &args[1];
-    }
-
-    let path = Path::new(path_str);
+    let path_str: String = args.input_path.unwrap_or("".to_string());
+    let path = Path::new(&path_str);
 
     let mut absolute_path = env::current_dir().unwrap();
     let mut state = InterpreterState::new();
@@ -76,11 +107,8 @@ fn main() {
 
     match path.exists() && path.is_file() {
         true => {
-            //lexemeize file
-
             let f = File::open(path).unwrap();
             let mut reader = BufReader::new(f);
-
             let mut buffer = String::new();
             reader.read_to_string(&mut buffer).unwrap();
             info!("File read");
@@ -89,15 +117,18 @@ fn main() {
             let _ = eval_file(&buffer);
         }
         false => {
-            //capture input and start lexemeizing that
-            info!("Type commands");
-            info!("Type {:?} to exit", exit_keyword);
-            info!("MiniPL> ");
+            println!("Type commands");
+            println!("Type {:?} to exit", exit_keyword);
+
             loop {
+                print!("MiniPL> ");
+                io::stdout().flush().unwrap();
                 let mut input_text: String = String::new();
                 io::stdin()
                     .read_line(&mut input_text)
                     .expect("failed to read from stdin");
+                trace!("Read: {}", input_text);
+                io::stdout().flush().unwrap();
                 if input_text.to_string().trim() == exit_keyword {
                     break;
                 }
@@ -130,8 +161,6 @@ fn eval_line(line: &str, mut state: &mut InterpreterState) {
 
 #[test]
 fn sample1_var_definition_expression_print() {
-    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
-                                        simplelog::Config::default());
     let code = r#"
 var X : int := 4 + (6 * 2);
 print X;
@@ -143,9 +172,6 @@ print X;
 
 #[test]
 fn sample2_loop_print() {
-    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Debug,
-                                        simplelog::Config::default());
-
     let code = r#"
 var nTimes : int := 0;
 print nTimes;
@@ -167,8 +193,6 @@ assert (x = (nTimes-1));
 
 #[test]
 fn sample4_decl_assign_print() {
-    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
-                                        simplelog::Config::default());
     let code = r#"
 var X : int;
 X := 15;
@@ -179,8 +203,6 @@ print X;
 
 #[test]
 fn test_decl_assign_boolean() {
-    let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
-                                        simplelog::Config::default());
     let code = r#"
 var X : bool;
 X := 15;

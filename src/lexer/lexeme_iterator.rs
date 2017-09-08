@@ -29,6 +29,7 @@ impl<'a> Clone for LexemeIterator<'a> {
     fn clone(&self) -> LexemeIterator<'a> {
         let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::StringLiteral, is_string_literal),
                                                                         (LexemeType::Keyword, is_keyword_lexeme),
+                                                                        (LexemeType::Bool, is_bool),
                                                                         (LexemeType::Identifier, is_identifier),
                                                                         (LexemeType::TwoChar, is_two_char_lexeme),
                                                                         (LexemeType::SingleChar, is_single_char_lexeme),
@@ -55,6 +56,7 @@ impl<'a> LexemeIterator<'a> {
 
         let lexeme_matchers: Vec<(LexemeType, fn(&str) -> bool)> = vec![(LexemeType::StringLiteral, is_string_literal),
                                                                         (LexemeType::Keyword, is_keyword_lexeme),
+                                                                        (LexemeType::Bool, is_bool),
                                                                         (LexemeType::Identifier, is_identifier),
                                                                         (LexemeType::TwoChar, is_two_char_lexeme),
                                                                         (LexemeType::SingleChar, is_single_char_lexeme),
@@ -227,6 +229,9 @@ fn is_identifier(lexeme: &str) -> bool {
     first_is_alphabetic && all_are_alpha_num
 }
 
+fn is_bool(lexeme: &str) -> bool {
+    lexeme.eq("true") || lexeme.eq("false")
+}
 
 
 #[test]
@@ -240,6 +245,11 @@ fn recornize_integer() -> () {
     assert_eq!(false, is_integer("+123"));
 }
 
+#[test]
+fn recognize_bool() -> () {
+    assert_eq!(true, is_bool("true"));
+    assert_eq!(true, is_bool("false"));
+}
 
 #[test]
 fn recornize_identifier() -> () {
@@ -334,7 +344,7 @@ fn lexemeize_integer_assignment() -> () {
 
 #[test]
 fn lexemeize_two_consecutive() -> () {
-    let code = include_str!("../sample4.txt");
+    let code = include_str!("../../sample4.txt");
     println!("{}", code);
     let mut iterator = LexemeIterator::new(code);
     assert_eq!(Some(Lexeme {
@@ -355,7 +365,7 @@ fn lexemeize_two_consecutive() -> () {
 
 #[test]
 fn lexemeize_two_consecutive_file_3() -> () {
-    let code = include_str!("../sample3.txt");
+    let code = include_str!("../../sample3.txt");
     println!("{}", code);
     let mut iterator = LexemeIterator::new(code);
     assert_eq!(Some(Lexeme {
@@ -397,7 +407,7 @@ fn lexemeize_two_consecutive_file_3() -> () {
 
 #[test]
 fn lexemeize_full_line() -> () {
-    let code = include_str!("../sample4.txt");
+    let code = include_str!("../../sample4.txt");
     println!("{}", code);
     let mut iterator = LexemeIterator::new(code);
     assert_eq!(Some(Lexeme {
@@ -439,7 +449,7 @@ fn lexemeize_full_line() -> () {
 
 #[test]
 fn lexemeize_multiple_lines() -> () {
-    let code = include_str!("../sample4.txt");
+    let code = include_str!("../../sample4.txt");
     println!("{}", code);
     let mut iterator = LexemeIterator::new(code);
     iterator.next();
