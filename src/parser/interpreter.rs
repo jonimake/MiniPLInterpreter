@@ -239,7 +239,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         match tt {
             TokenType::Identifier => {
                 match self.get_variable_value(&token) {
-                    Some(var) => println!("{} => {:?}", token.lexeme.unwrap().lexeme, var),
+                    Some(var) => println!("{} => {}", token.lexeme.unwrap().lexeme, var),
                     None => println!("{} => None", token.lexeme.unwrap().lexeme),
                 };
             }
