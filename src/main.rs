@@ -1,92 +1,104 @@
-#![allow(unused_parens)]
-#![allow(unused_imports)]
-#![allow(dead_code)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-
-pub mod lexeme;
-pub mod lexeme_iterator;
+pub mod lexer;
 pub mod parser;
 
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate simplelog;
-extern crate clap;
+extern crate structopt;
+#[macro_use] extern crate structopt_derive;
 
-use clap::{Arg, App, SubCommand};
+use simplelog::LogLevelFilter;
+use simplelog::Config;
+use simplelog::TermLogger;
+use structopt::StructOpt;
 
-use lexeme_iterator::LexemeIterator;
-use lexeme::Lexeme;
+use lexer::lexeme_iterator::LexemeIterator;
 use parser::token::Token;
 use parser::token_iterator::TokenIterator;
 use parser::interpreter::Interpreter;
-//use parser::Token;
+use parser::interpreter::InterpreterState;
 
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::io::BufReader;
-use std::str::SplitWhitespace;
-use std::iter::Peekable;
 use std::env;
-use std::path::PathBuf;
 use std::io;
-use std::collections::HashMap;
-use std::vec::Vec;
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "MiniPLInterpreter")]
+struct Cli {
+    #[structopt(long = "inputpath", short = "i",
+    help="Path to file to be interpreted. If left empty, the program will wait for stdin to be interpreted.")]
+    input_path: Option<String>,
 
-static HAS_INIT: bool = false;
+    #[structopt(long = "loglevel", short="l")]
+    log_level: Option<LogLevel>
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "loglevel")]
+enum LogLevel {
+    #[structopt(name = "error")]
+    Error,
+    #[structopt(name = "info")]
+    Info,
+    #[structopt(name = "warning")]
+    Warning,
+    #[structopt(name = "debug")]
+    Debug,
+    #[structopt(name = "trace")]
+    Trace,
+}
+
+impl std::str::FromStr for LogLevel {
+    type Err = std::string::ParseError;
+
+    fn from_str(text: &str) -> std::result::Result<Self, Self::Err> {
+        match text {
+
+            "info" => Result::Ok(LogLevel::Info),
+            "warning" => Result::Ok(LogLevel::Warning),
+            "debug" => Result::Ok(LogLevel::Debug),
+            "trace" => Result::Ok(LogLevel::Trace),
+            "error" => Result::Ok(LogLevel::Error),
+            _ => Result::Ok(LogLevel::Error)
+        }
+    }
+}
+
+impl Into<LogLevelFilter> for LogLevel {
+    fn into(self) -> LogLevelFilter {
+        match self {
+            LogLevel::Error => LogLevelFilter::Error,
+            LogLevel::Info  => LogLevelFilter::Info,
+            LogLevel::Warning  => LogLevelFilter::Warn,
+            LogLevel::Debug => LogLevelFilter::Debug,
+            LogLevel::Trace => LogLevelFilter::Trace
+        }
+    }
+}
 
 fn main() {
 
-    let _ = App::new("MiniPL Interpreter")
-        .version("1.0")
-        .author("Joni M. <joni.makela@gmail.com>")
-        .about("MiniPL language interpreter")
-        .arg(Arg::with_name("INPUT")
-            .help("File to interpret")
-            .required(false)
-            .index(1))
-        .arg(Arg::with_name("log")
-            .short("l")
-            .help("Sets the level of log verbosity"))
-        .get_matches();
-
-
-
-    let args = env::args().collect::<Vec<String>>();
-    info!("{:?}", args);
-    if args.len() > 2 {
-        let level: simplelog::LogLevelFilter = match args[2].as_ref() {
-            "info" => simplelog::LogLevelFilter::Info,
-            "debug" => simplelog::LogLevelFilter::Debug,
-            "error" => simplelog::LogLevelFilter::Error,
-            "trace" => simplelog::LogLevelFilter::Trace,
-            "warn" => simplelog::LogLevelFilter::Warn,
-            _ => simplelog::LogLevelFilter::Error,
-        };
-        let _ = simplelog::TermLogger::init(level, simplelog::Config::default());
-        info!("Log level: {}", level);
-
-    } else {
-        let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Info,
-                                            simplelog::Config::default());
-    }
+    let args = Cli::from_args();
+    let ll = args.log_level;
+    let level_filter: LogLevelFilter = match ll {
+        Some(level) => {
+            level.into()
+        },
+        _ => {
+            LogLevelFilter::Error
+        }
+    };
+    let _ = TermLogger::init(level_filter, Config::default());
 
     info!("MiniPL Interpreter starting!");
 
-    let mut pathStr: &str = "";
-    if args.len() > 1 {
-        pathStr = &args[1];
-    }
-
-    let path = Path::new(pathStr);
+    let path_str: String = args.input_path.unwrap_or("".to_string());
+    let path = Path::new(&path_str);
 
     let mut absolute_path = env::current_dir().unwrap();
-    let mut state: HashMap<String, Token> = HashMap::new();
-    //let mut string_cache: Box<HashMap<u64, String>> = Box::new(HashMap::new());
-    let mut string_cache: HashMap<u64, String> = HashMap::new();
+    let mut state = InterpreterState::new();
 
     debug!("The current directory is {}", absolute_path.display());
     absolute_path.push(path);
@@ -95,11 +107,8 @@ fn main() {
 
     match path.exists() && path.is_file() {
         true => {
-            //lexemeize file
-
             let f = File::open(path).unwrap();
             let mut reader = BufReader::new(f);
-
             let mut buffer = String::new();
             reader.read_to_string(&mut buffer).unwrap();
             info!("File read");
@@ -108,19 +117,22 @@ fn main() {
             let _ = eval_file(&buffer);
         }
         false => {
-            //capture input and start lexemeizing that
-            info!("Type commands");
-            info!("Type {:?} to exit", exit_keyword);
-            info!("MiniPL> ");
+            println!("Type commands");
+            println!("Type {:?} to exit", exit_keyword);
+
             loop {
+                print!("MiniPL> ");
+                io::stdout().flush().unwrap();
                 let mut input_text: String = String::new();
                 io::stdin()
                     .read_line(&mut input_text)
                     .expect("failed to read from stdin");
+                trace!("Read: {}", input_text);
+                io::stdout().flush().unwrap();
                 if input_text.to_string().trim() == exit_keyword {
                     break;
                 }
-                eval_line(&input_text.to_string().trim() , &mut state, &mut string_cache);
+                eval_line(&input_text.to_string().trim() , &mut state);
 
             }
         }
@@ -128,21 +140,19 @@ fn main() {
 }
 
 fn eval_file(file_contents: &str) -> Result<(), String> {
-    let mut state = HashMap::new();
-    let mut string_cache = HashMap::new();
     let lexeme_it = LexemeIterator::new(file_contents);
-    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: lexeme_it };
-    let mut interpreter = Interpreter::new(&mut tokenIterator as &mut Iterator<Item = Token>,
-                                           &mut state,
-                                           &mut string_cache);
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: lexeme_it };
+    let mut state = InterpreterState::new();
+    let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>,
+                                           &mut state);
     interpreter.interpret()
 }
 
-fn eval_line(line: &str, mut state: &mut HashMap<String, Token>, mut string_cache: &mut HashMap<u64, String>) {
+fn eval_line(line: &str, mut state: &mut InterpreterState) {
     info!("{:?}", line);
     let it = LexemeIterator::new(line);
-    let mut tokenIterator: TokenIterator<LexemeIterator> = TokenIterator { lexIter: it };
-    let mut interpreter = Interpreter::new(&mut tokenIterator, &mut state, &mut string_cache);
+    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator { lex_iter: it };
+    let mut interpreter = Interpreter::new(&mut token_iterator, &mut state);
     match interpreter.interpret() {
         Err(msg) => info!("Error: {}", msg),
         _ => {}
@@ -167,12 +177,15 @@ var nTimes : int := 0;
 print nTimes;
 print "How many times?";
 nTimes := 3;
+print nTimes;
 var x : int;
 for x in 0..nTimes-1 do
 	print x;
 	print " : Hello, World!\n";
 end for;
-assert (x = nTimes);
+print x;
+print nTimes;
+assert (x = (nTimes-1));
 "#;
     eval_file(code).unwrap();
 }
@@ -182,6 +195,16 @@ assert (x = nTimes);
 fn sample4_decl_assign_print() {
     let code = r#"
 var X : int;
+X := 15;
+print X;
+"#;
+    eval_file(code).unwrap();
+}
+
+#[test]
+fn test_decl_assign_boolean() {
+    let code = r#"
+var X : bool;
 X := 15;
 print X;
 "#;

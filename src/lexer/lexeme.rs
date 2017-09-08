@@ -19,6 +19,17 @@ impl Lexeme {
     }
 }
 
+impl<'a> From<&'a str> for Lexeme {
+    fn from(text: &'a str) -> Lexeme {
+        Lexeme {
+            lexeme_type: LexemeType::default(),
+            lexeme: text.to_owned(),
+            line: 0,
+            column: 0,
+        }
+    }
+}
+
 impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
@@ -32,12 +43,13 @@ impl fmt::Display for Lexeme {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LexemeType {
-    single_char,
-    two_char,
-    keyword,
-    integer,
-    string_literal,
-    identifier,
+    SingleChar,
+    TwoChar,
+    Keyword,
+    Bool,
+    Integer,
+    StringLiteral,
+    Identifier,
     NA,
 }
 

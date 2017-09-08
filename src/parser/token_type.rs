@@ -1,7 +1,5 @@
 use std::fmt;
 
-use lexeme::Lexeme;
-
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TokenType {
     Identifier,
@@ -51,7 +49,7 @@ impl fmt::Display for TokenType {
         match *self {
             TokenType::IntegerValue(integer) => write!(f, "{}", integer),
             TokenType::BooleanValue(boolean) => write!(f, "{}", boolean),
-            _ => write!(f, "{}", "unimplemented"),
+            _ => write!(f, "{:?}", self),
         }
     }
 }
