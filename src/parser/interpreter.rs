@@ -19,14 +19,20 @@ impl InterpreterState {
     pub fn new() -> InterpreterState {
         InterpreterState {
             variables: HashMap::new(),
-            string_cache: HashMap::new()
+            string_cache: HashMap::new(),
         }
     }
+}
+
+enum Err {
+    ParseError(String),
+    UnexpectedToken(String),
 }
 
 pub struct Interpreter<'a, 'b:'a> {
     interpreter_state: &'b mut InterpreterState,
     iterator: Peekable<TokenIteratorType<'a>>,
+    errors: Vec<Err>
 }
 
 impl<'a, 'b: 'a> Interpreter<'a, 'b> {
@@ -35,7 +41,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                -> Interpreter<'a, 'b> {
         Interpreter {
             interpreter_state: state,
-            iterator: iter.peekable()
+            iterator: iter.peekable(),
+            errors: Vec::new()
         }
     }
 

@@ -1,3 +1,6 @@
+#![allow(unknown_lints)]
+#![warn(clippy)]
+
 pub mod lexer;
 pub mod parser;
 
@@ -79,7 +82,7 @@ impl Into<LogLevelFilter> for LogLevel {
 }
 
 fn main() {
-
+    let _example = 1230000000;
     let args = Cli::from_args();
     let ll = args.log_level;
     let level_filter: LogLevelFilter = match ll {
@@ -92,7 +95,9 @@ fn main() {
     };
     let _ = TermLogger::init(level_filter, Config::default());
 
-    info!("MiniPL Interpreter starting!");
+    println!("foo");
+
+    info!("MiniPL Interpreter starting! foo");
 
     let path_str: String = args.input_path.unwrap_or("".to_string());
     let path = Path::new(&path_str);
