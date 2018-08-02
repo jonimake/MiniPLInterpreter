@@ -95,9 +95,7 @@ fn main() {
     };
     let _ = TermLogger::init(level_filter, Config::default());
 
-    println!("foo");
-
-    info!("MiniPL Interpreter starting! foo");
+    info!("MiniPL Interpreter starting!");
 
     let path_str: String = args.input_path.unwrap_or("".to_string());
     let path = Path::new(&path_str);
@@ -154,12 +152,12 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
 }
 
 fn eval_line(line: &str, mut state: &mut InterpreterState) {
-    info!("{:?}", line);
+    debug!("{:?}", line);
     let it = LexemeIterator::new(line);
     let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(it);
     let mut interpreter = Interpreter::new(&mut token_iterator, &mut state);
     match interpreter.interpret() {
-        Err(msg) => info!("Error: {}", msg),
+        Err(msg) => error!("{}", msg),
         _ => {}
     }
 }

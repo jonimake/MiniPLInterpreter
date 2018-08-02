@@ -373,8 +373,15 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                     let _ = tokens.pop();
                     unimplemented!();
                 } else {
-                    let t1: Token = stack.pop().unwrap();
-                    let t2: Token = stack.pop().unwrap();
+                    let t1 = stack.pop();
+                    let t2 = stack.pop();
+
+                    if t1.is_none() || t2.is_none() {
+                        return Err(format!("Expected token, found none"));
+                    }
+
+                    let t1 = t1.unwrap();
+                    let t2 = t2.unwrap();
 
                     let result: Token = match (t1.token_type, t2.token_type) {
                         (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(b, a, operator_token_type)?,
@@ -385,7 +392,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                         }
                         (TokenType::Identifier, _) => {
                             binary_op(&t2,
-                            &self.get_variable_value(&t1).unwrap(),
+                                      &self.get_variable_value(&t1).unwrap(),
                                       &operator_token_type)?
                         }
                         (_, TokenType::Identifier) => {
@@ -414,7 +421,11 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         }
         if stack.len() != 1 {
             error!("Stack: {:?}", stack);
-            panic!("Stack length wasn't 1, error occurred");
+            if stack.is_empty() {
+                return Err(format!("Expected input while it was empty"));
+            } else {
+                panic!("Stack length wasn't 1, error occurred");
+            }
         } else {
             let result = Ok(stack[0].clone());
             return result;
