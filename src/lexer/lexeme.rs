@@ -30,19 +30,14 @@ impl<'a> From<&'a str> for Lexeme {
     }
 }
 
-pub trait FromLexeme : Sized {
+pub trait FromLexeme: Sized {
     type Err;
     fn from_lexeme(lx: Lexeme) -> Result<Self, Self::Err>;
 }
 
 impl fmt::Display for Lexeme {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "{}\t ({}:{})\t [{:?}]",
-               self.lexeme,
-               self.line,
-               self.column,
-               self.lexeme_type)
+        write!(f, "{}\t ({}:{})\t [{:?}]", self.lexeme, self.line, self.column, self.lexeme_type)
     }
 }
 

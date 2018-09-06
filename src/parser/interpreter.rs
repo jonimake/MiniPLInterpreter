@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use std::iter::Peekable;
-use std::vec::Vec;
 use std::result::Result;
+use std::vec::Vec;
 
+use lexer::lexeme::Lexeme;
 use parser::token::Token;
 use parser::token_type::TokenType;
-use lexer::lexeme::Lexeme;
 
 type TokenIteratorType<'a> = &'a mut Iterator<Item = Token>;
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct InterpreterState {
     pub variables: HashMap<String, Token>,
     pub string_cache: HashMap<u64, String>,
@@ -29,23 +30,20 @@ enum Err {
     UnexpectedToken(String),
 }
 
-pub struct Interpreter<'a, 'b:'a> {
+pub struct Interpreter<'a, 'b: 'a> {
     interpreter_state: &'b mut InterpreterState,
     iterator: Peekable<TokenIteratorType<'a>>,
-    errors: Vec<Err>
+    errors: Vec<Err>,
 }
 
 impl<'a, 'b: 'a> Interpreter<'a, 'b> {
-    pub fn new(iter: TokenIteratorType<'a>,
-               state: &'b mut InterpreterState)
-               -> Interpreter<'a, 'b> {
+    pub fn new(iter: TokenIteratorType<'a>, state: &'b mut InterpreterState) -> Interpreter<'a, 'b> {
         Interpreter {
             interpreter_state: state,
             iterator: iter.peekable(),
-            errors: Vec::new()
+            errors: Vec::new(),
         }
     }
-
 
     pub fn interpret(&mut self) -> Result<(), String> {
         while self.iterator.peek().cloned().is_some() {
@@ -77,53 +75,64 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             };
 
             self.expect_next(TokenType::StatementEnd)?;
-
         }
         Ok(())
     }
 
     fn read(&mut self) -> Result<(), String> {
-
         let tokens: (Token, Token) = {
             let _ = self.expect_next(TokenType::Read)?;
             let id = self.expect_next(TokenType::Identifier)?;
             let maybetoken = self.get_variable_value(&id);
             let variable = match maybetoken {
                 Some(t) => t,
-                None => return Err(format!("Can't read variable with an invalid variable ID")),
+                None => return Err("Can't read variable with an invalid variable ID".to_string()),
             };
 
             use std::io;
 
             let mut input_text = String::new();
-            io::stdin()
-                .read_line(&mut input_text)
-                .expect("failed to read from stdin");
+            io::stdin().read_line(&mut input_text).expect("failed to read from stdin");
 
             let trimmed = input_text.trim();
 
             let t: Token = match variable {
-                Token { token_type: TokenType::IntegerValue(_), .. }
-                | Token { token_type: TokenType::IntegerType, .. }
-                => {
+                Token {
+                    token_type: TokenType::IntegerValue(_),
+                    ..
+                }
+                | Token {
+                    token_type: TokenType::IntegerType,
+                    ..
+                } => {
                     let parsed_value = trimmed.parse::<i32>().unwrap_or(0);
                     let tt = TokenType::IntegerValue(parsed_value);
                     Token::new_string(tt, trimmed)
-                },
-                Token { token_type: TokenType::BooleanType, .. }
-                | Token { token_type: TokenType::BooleanValue(_), .. }
-                => {
+                }
+                Token {
+                    token_type: TokenType::BooleanType,
+                    ..
+                }
+                | Token {
+                    token_type: TokenType::BooleanValue(_),
+                    ..
+                } => {
                     let parsed_value = trimmed.parse::<bool>().unwrap_or(false);
                     let tt = TokenType::BooleanValue(parsed_value);
                     Token::new_string(tt, trimmed)
-                },
-                Token { token_type: TokenType::StringType, .. }
-                | Token { token_type: TokenType::StringLiteral(_), .. }
-                => {
+                }
+                Token {
+                    token_type: TokenType::StringType,
+                    ..
+                }
+                | Token {
+                    token_type: TokenType::StringLiteral(_),
+                    ..
+                } => {
                     let tt = TokenType::StringLiteral(0);
                     Token::new_string(tt, trimmed)
                 }
-                _ => return Err(format!("Variable not defined for read"))
+                _ => return Err("Variable not defined for read".to_string()),
             };
             (id, t)
         };
@@ -135,8 +144,14 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         self.expect_next(TokenType::Assert)?;
         let assert_value = self.expression(None)?;
         match assert_value {
-            Token { token_type: TokenType::BooleanValue(true), .. } => Ok(()),
-            Token { token_type: TokenType::BooleanValue(false), .. } => Err(format!("assertion error")),
+            Token {
+                token_type: TokenType::BooleanValue(true),
+                ..
+            } => Ok(()),
+            Token {
+                token_type: TokenType::BooleanValue(false),
+                ..
+            } => Err("assertion error".to_string()),
             _ => Err("error evaluating assertion value".to_string()),
         }
     }
@@ -169,13 +184,21 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         }
 
         match (range_start, range_end) {
-            (Token { token_type: TokenType::IntegerValue(start_int), .. }, Token { token_type: TokenType::IntegerValue(end_int), .. }) => {
-                for x in start_int..end_int+1 {
+            (
+                Token {
+                    token_type: TokenType::IntegerValue(start_int),
+                    ..
+                },
+                Token {
+                    token_type: TokenType::IntegerValue(end_int),
+                    ..
+                },
+            ) => {
+                for x in start_int..end_int + 1 {
                     trace!("loop {}", x);
                     let mut token_iter = all_tokens.clone().into_iter();
                     //not sure if doing something incredibly dirty
-                    self.set_variable_value(loop_id.clone(),
-                                            Token::new(TokenType::IntegerValue(x), Lexeme::default()));
+                    self.set_variable_value(loop_id.clone(), Token::new(TokenType::IntegerValue(x), Lexeme::default()));
 
                     debug!("state before interpret: {:?}", self.interpreter_state);
                     {
@@ -185,7 +208,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                     debug!("state after interpret: {:?}", self.interpreter_state);
                 }
             }
-            _ => return Err(format!("Ranges not implemented for other than Integer starts and ends")),
+            _ => return Err("Ranges not implemented for other than Integer starts and ends".to_string()),
         }
         Ok(())
     }
@@ -197,14 +220,13 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
     }
 
     fn get_variable_value(&self, name: &Token) -> Option<Token> {
-
         let name_lexeme = name.clone().lexeme.unwrap();
         let name: String = name_lexeme.lexeme.to_string();
         match self.interpreter_state.variables.get(&name) {
             Some(t) => {
                 trace!("get {:?} = {:?}", name, t.clone());
                 Some(t.clone())
-            },
+            }
             None => {
                 trace!("get {:?} = None", name);
                 None
@@ -258,14 +280,13 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         Ok(())
     }
     fn expression(&mut self, terminator_symbol: Option<TokenType>) -> Result<Token, String> {
-
         let mut all_tokens: Vec<Token> = Vec::new();
         loop {
-            let token = self.iterator
+            let token = self
+                .iterator
                 .peek()
                 .cloned()
-                .unwrap_or(Token::new(terminator_symbol.unwrap_or(TokenType::StatementEnd),
-                                      Lexeme::default()));
+                .unwrap_or_else(|| Token::new(terminator_symbol.unwrap_or(TokenType::StatementEnd), Lexeme::default()));
             if token.token_type == terminator_symbol.unwrap_or(TokenType::StatementEnd) {
                 break;
             } else {
@@ -287,58 +308,56 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                 | TokenType::Division
                 | TokenType::Subtraction
                 | TokenType::Equal
-                | TokenType::Negation
-                => {
-
+                | TokenType::Negation => {
                     while let Some(y) = opstack.last().cloned() {
-                        counter = counter+1;
+                        counter += 1;
                         if is_operator(&y) && precedence_equal_or_less_than(token_type, y.token_type) {
                             output.push(opstack.pop().unwrap());
-                        }
-                        else {
+                        } else {
                             break;
                         }
                         if counter > 10000 {
                             error!("{:?}", y);
-                            return Err(format!("loop detected"));
+                            return Err("loop detected".to_string());
                         }
                     }
                     opstack.push(token);
-                },
-                TokenType::LParen => {opstack.push(token)},
+                }
+                TokenType::LParen => opstack.push(token),
 
                 TokenType::RParen => {
                     while let Some(token) = opstack.last().cloned() {
                         let tt: TokenType = token.token_type;
                         match tt {
-                            TokenType::LParen => {opstack.pop();},
-                            _ => output.push(opstack.pop().unwrap())
+                            TokenType::LParen => {
+                                opstack.pop();
+                            }
+                            _ => output.push(opstack.pop().unwrap()),
                         }
                     }
-
-                },
+                }
                 //handle operand
-                _ => {output.push(token)}
+                _ => output.push(token),
             }
         }
         while let Some(token) = opstack.pop() {
             output.push(token);
         }
 
-        return self.evaluate_postfix(&mut output);
+        self.evaluate_postfix(&mut output)
     }
 
     fn expect_next(&mut self, tt: TokenType) -> Result<Token, String> {
         let maybetoken = self.iterator.next();
         if let Some(token) = maybetoken {
-            trace!("expect_next {:?}, actual {:?}", tt.clone(), token.clone());
+            trace!("expect_next {:?}, actual {:?}", tt, token.clone());
             if token.token_type == tt {
                 return Ok(token);
             } else {
                 return Err(format!("\nUnexpected token {:?},\nexpected type {:?}\n", token, tt));
             }
         }
-        Err(format!("Expected token but iterator was empty"))
+        Err("Expected token but iterator was empty".to_string())
     }
 
     fn expect_peek(&mut self, tt: TokenType) -> bool {
@@ -349,7 +368,6 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         false
     }
 
-
     fn evaluate_postfix(&mut self, tokens: &mut Vec<Token>) -> Result<Token, String> {
         let mut stack: Vec<Token> = Vec::new();
 
@@ -359,9 +377,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             let type2 = t2.token_type;
             debug!("types = {:?}, {:?}", type1, type2);
             match (type1, type2) {
-
                 (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(a, b, *operator_token_type),
-                t @ _ => return Err(format!("Binary operation {:?} not defined for types {:?}", operator_token_type, t)),
+                t => Err(format!("Binary operation {:?} not defined for types {:?}", operator_token_type, t)),
             }
         }
 
@@ -377,7 +394,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                     let t2 = stack.pop();
 
                     if t1.is_none() || t2.is_none() {
-                        return Err(format!("Expected token, found none"));
+                        return Err("Expected token, found none".to_string());
                     }
 
                     let t1 = t1.unwrap();
@@ -390,27 +407,15 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                             let b = self.get_variable_value(&t2).unwrap();
                             binary_op(&a, &b, &operator_token_type)?
                         }
-                        (TokenType::Identifier, _) => {
-                            binary_op(&t2,
-                                      &self.get_variable_value(&t1).unwrap(),
-                                      &operator_token_type)?
-                        }
-                        (_, TokenType::Identifier) => {
-                            binary_op(&self.get_variable_value(&t2).unwrap(),
-                                      &t1,
-                                      &operator_token_type)?
-                        }
+                        (TokenType::Identifier, _) => binary_op(&t2, &self.get_variable_value(&t1).unwrap(), &operator_token_type)?,
+                        (_, TokenType::Identifier) => binary_op(&self.get_variable_value(&t2).unwrap(), &t1, &operator_token_type)?,
                         (TokenType::StringLiteral(_), TokenType::StringLiteral(_)) => {
                             Token::new(TokenType::StringLiteral(0), Lexeme::default())
                         }
-                        (TokenType::BooleanValue(a), TokenType::BooleanValue(b)) => {
-                            match operator_token_type {
-                                TokenType::Equal => {
-                                    Token::new(TokenType::BooleanValue(a == b), Lexeme::default())
-                                }
-                                _ => return Err(format!("Only equality is implemented for boolean tokens"))
-                            }
-                        }
+                        (TokenType::BooleanValue(a), TokenType::BooleanValue(b)) => match operator_token_type {
+                            TokenType::Equal => Token::new(TokenType::BooleanValue(a == b), Lexeme::default()),
+                            _ => return Err("Only equality is implemented for boolean tokens".to_string()),
+                        },
                         _ => return Err(format!("Unimplemented for tokens {:?} and {:?}", t1, t2)),
                     };
                     stack.push(result);
@@ -422,7 +427,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         if stack.len() != 1 {
             error!("Stack: {:?}", stack);
             if stack.is_empty() {
-                return Err(format!("Expected input while it was empty"));
+                Err("Expected input while it was empty".to_string())
             } else {
                 panic!("Stack length wasn't 1, error occurred");
             }
@@ -436,16 +441,15 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
 fn is_operator(token: &Token) -> bool {
     let token_type = token.token_type;
     match token_type {
-        TokenType::Addition |
-        TokenType::Multiplication |
-        TokenType::Division |
-        TokenType::Equal |
-        TokenType::Subtraction |
-        TokenType::Negation => true,
+        TokenType::Addition
+        | TokenType::Multiplication
+        | TokenType::Division
+        | TokenType::Equal
+        | TokenType::Subtraction
+        | TokenType::Negation => true,
         _ => false,
     }
 }
-
 
 fn binary_integer_op(a: i32, b: i32, op: TokenType) -> Result<Token, String> {
     let tt = match op {
@@ -467,22 +471,21 @@ fn binary_integer_op(a: i32, b: i32, op: TokenType) -> Result<Token, String> {
 
 fn precedence_equal_or_less_than(x: TokenType, y: TokenType) -> bool {
     match x {
-        TokenType::Multiplication |
-        TokenType::Division => {
-            match y {
-                TokenType::Addition | TokenType::Subtraction => false,
-                _ => true,
-            }
-        }
+        TokenType::Multiplication | TokenType::Division => match y {
+            TokenType::Addition | TokenType::Subtraction => false,
+            _ => true,
+        },
         _ => true,
     }
 }
 
 #[test]
 fn evaluate_postfix_simple_addition() {
-    let mut tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(1), "1"),
-                                      Token::new_string(TokenType::IntegerValue(2), "2"),
-                                      Token::new_string(TokenType::Addition, "+")];
+    let mut tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::IntegerValue(2), "2"),
+        Token::new_string(TokenType::Addition, "+"),
+    ];
 
     let mut iter = vec![].into_iter();
     let mut state = InterpreterState::new();
@@ -498,26 +501,33 @@ fn for_loop_test() {
     //  print x;
     //end for;
 
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::For, "for"),
-                                      Token::new_string(TokenType::Identifier, "x"),
-                                      Token::new_string(TokenType::In, "in"),
-                                      Token::new_string(TokenType::IntegerValue(0), "0"),
-                                      Token::new_string(TokenType::RangeDots, ".."),
-                                      Token::new_string(TokenType::IntegerValue(3), "3"),
-                                      Token::new_string(TokenType::Do, "do"),
-                                      Token::new_string(TokenType::Print, "print"),
-                                      Token::new_string(TokenType::Identifier, "x"),
-                                      Token::new_string(TokenType::StatementEnd, ";"),
-                                      Token::new_string(TokenType::End, "end"),
-                                      Token::new_string(TokenType::For, "for"),
-                                      Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::For, "for"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::In, "in"),
+        Token::new_string(TokenType::IntegerValue(0), "0"),
+        Token::new_string(TokenType::RangeDots, ".."),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::Do, "do"),
+        Token::new_string(TokenType::Print, "print"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+        Token::new_string(TokenType::End, "end"),
+        Token::new_string(TokenType::For, "for"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     let foo: Result<(), String> = int.for_loop();
     assert_eq!(Ok(()), foo);
-    assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token{token_type: TokenType::IntegerValue(3), lexeme: Some(Lexeme::default())}));
+    assert_eq!(
+        int.interpreter_state.variables.get("x"),
+        Some(&Token {
+            token_type: TokenType::IntegerValue(3),
+            lexeme: Some(Lexeme::default())
+        })
+    );
 }
 
 #[test]
@@ -536,7 +546,6 @@ fn for_loop_assert_test() {
         Token::new_string(TokenType::ValueDefinition, ":="),
         Token::new_string(TokenType::IntegerValue(3), "3"),
         Token::new_string(TokenType::StatementEnd, ";"),
-
         Token::new_string(TokenType::For, "for"),
         Token::new_string(TokenType::Identifier, "x"),
         Token::new_string(TokenType::In, "in"),
@@ -553,17 +562,17 @@ fn for_loop_assert_test() {
         Token::new_string(TokenType::End, "end"),
         Token::new_string(TokenType::For, "for"),
         Token::new_string(TokenType::StatementEnd, ";"),
-
         Token::new_string(TokenType::Assert, "assert"),
         Token::new_string(TokenType::LParen, "("),
         Token::new_string(TokenType::Identifier, "x"),
         Token::new_string(TokenType::Equal, "="),
-        Token::new_string(TokenType::LParen, "(",),
+        Token::new_string(TokenType::LParen, "("),
         Token::new_string(TokenType::Identifier, "nTimes"),
         Token::new_string(TokenType::Subtraction, "-"),
         Token::new_string(TokenType::IntegerValue(1), "1"),
         Token::new_string(TokenType::RParen, ")"),
-        Token::new_string(TokenType::StatementEnd, ";")];
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -571,23 +580,29 @@ fn for_loop_assert_test() {
     let foo: Result<(), String> = int.interpret();
     println!("{:?}", int.interpreter_state.variables);
     assert_eq!(Ok(()), foo);
-    assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token{token_type: TokenType::IntegerValue(2), lexeme: Some(Lexeme::default())}));
+    assert_eq!(
+        int.interpreter_state.variables.get("x"),
+        Some(&Token {
+            token_type: TokenType::IntegerValue(2),
+            lexeme: Some(Lexeme::default())
+        })
+    );
 }
-
 
 #[test]
 fn evaluate_postfix_complex() {
     //5 1 2 + 4 * + 3 −
-    let mut tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(5), "5"),
-                                      Token::new_string(TokenType::IntegerValue(1), "1"),
-                                      Token::new_string(TokenType::IntegerValue(2), "2"),
-                                      Token::new_string(TokenType::Addition, "+"),
-                                      Token::new_string(TokenType::IntegerValue(4), "4"),
-                                      Token::new_string(TokenType::Multiplication, "*"),
-                                      Token::new_string(TokenType::Addition, "+"),
-                                      Token::new_string(TokenType::IntegerValue(3), "3"),
-                                      Token::new_string(TokenType::Subtraction, "-")];
+    let mut tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(5), "5"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::IntegerValue(2), "2"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(4), "4"),
+        Token::new_string(TokenType::Multiplication, "*"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::Subtraction, "-"),
+    ];
     let mut iter = vec![].into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
@@ -598,13 +613,15 @@ fn evaluate_postfix_complex() {
 #[test]
 fn parse_var_definition() {
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  val.clone(),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        val.clone(),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -616,13 +633,15 @@ fn parse_var_definition() {
 
 #[test]
 fn parse_var_definition_2() {
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "string"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  Token::new_string(TokenType::StringLiteral(0), "\"foobar\""),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "string"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::StringLiteral(0), "\"foobar\""),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -635,11 +654,13 @@ fn parse_var_declaration() {
     let xtoken = Token::new_string(TokenType::Identifier, "x");
     let tokentype = Token::new_string(TokenType::IntegerType, "int");
     let lexeme = Lexeme::default();
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  tokentype.clone(),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        tokentype.clone(),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -654,9 +675,11 @@ fn parse_print_string_integer() {
     let lexeme = Lexeme::default();
     let id = Token::new_string(TokenType::Identifier, "x");
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::Print, "print"),
-                                  Token::new_string(TokenType::IntegerValue(23), "23"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::Print, "print"),
+        Token::new_string(TokenType::IntegerValue(23), "23"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -670,9 +693,11 @@ fn parse_print_string_literal() {
     let lexeme = Lexeme::default();
     let id = Token::new_string(TokenType::Identifier, "x");
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::Print, "print"),
-                                  Token::new_string(TokenType::StringLiteral(0), "foobar"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::Print, "print"),
+        Token::new_string(TokenType::StringLiteral(0), "foobar"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -687,16 +712,18 @@ fn parse_print_complicated() {
     let lexeme = Lexeme::default();
     let id = Token::new_string(TokenType::Identifier, "x");
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  val,
-                                  Token::new_string(TokenType::StatementEnd, ";"),
-                                  Token::new_string(TokenType::Print, "print"),
-                                  id.clone(),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        val,
+        Token::new_string(TokenType::StatementEnd, ";"),
+        Token::new_string(TokenType::Print, "print"),
+        id.clone(),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -711,27 +738,30 @@ fn parse_print_complicated() {
 fn parse_expression_1() {
     let lexeme = Lexeme::default();
 
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(1), "1")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
-    assert_eq!(result.unwrap(),
-               Token::new(TokenType::IntegerValue(2), Lexeme::default()));
+    assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(2), Lexeme::default()));
 }
 
 #[test]
 fn parse_assert() {
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::Assert, "assert"),
-                                  Token::new_string(TokenType::LParen, "("),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Equal, "="),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::RParen, ")"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::Assert, "assert"),
+        Token::new_string(TokenType::LParen, "("),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Equal, "="),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::RParen, ")"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -745,29 +775,28 @@ fn parse_assert_identifier() {
     //var y : int := 3;
     //assert(x = y);
     let tokens: Vec<Token> = vec![
-                                Token::new_string(TokenType::VarKeyword, "var"),
-                                Token::new_string(TokenType::Identifier, "x"),
-                                Token::new_string(TokenType::TypeDeclaration, ":"),
-                                Token::new_string(TokenType::IntegerType, "int"),
-                                Token::new_string(TokenType::ValueDefinition, ":="),
-                                Token::new_string(TokenType::IntegerValue(3), "3"),
-                                Token::new_string(TokenType::StatementEnd, ";"),
-
-                                Token::new_string(TokenType::VarKeyword, "var"),
-                                Token::new_string(TokenType::Identifier, "y"),
-                                Token::new_string(TokenType::TypeDeclaration, ":"),
-                                Token::new_string(TokenType::IntegerType, "int"),
-                                Token::new_string(TokenType::ValueDefinition, ":="),
-                                Token::new_string(TokenType::IntegerValue(3), "3"),
-                                Token::new_string(TokenType::StatementEnd, ";"),
-
-                                Token::new_string(TokenType::Assert, "assert"),
-                                Token::new_string(TokenType::LParen, "("),
-                                Token::new_string(TokenType::Identifier, "x"),
-                                Token::new_string(TokenType::Equal, "="),
-                                Token::new_string(TokenType::Identifier, "y"),
-                                Token::new_string(TokenType::RParen, ")"),
-                                Token::new_string(TokenType::StatementEnd, ";")];
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "y"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+        Token::new_string(TokenType::Assert, "assert"),
+        Token::new_string(TokenType::LParen, "("),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::Equal, "="),
+        Token::new_string(TokenType::Identifier, "y"),
+        Token::new_string(TokenType::RParen, ")"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -778,9 +807,11 @@ fn parse_assert_identifier() {
 
 #[test]
 fn evaluate_postfix_equality() {
-    let mut tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(1), "1"),
-                                      Token::new_string(TokenType::IntegerValue(1), "1"),
-                                      Token::new_string(TokenType::Equal, "=")];
+    let mut tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Equal, "="),
+    ];
 
     let mut iter = vec![].into_iter();
     let mut state = InterpreterState::new();
@@ -790,58 +821,57 @@ fn evaluate_postfix_equality() {
 
 #[test]
 fn parse_expression_2() {
-    let lexeme = Lexeme::default();
-
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Subtraction, "-"),
-                                  Token::new_string(TokenType::IntegerValue(1), "1")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Subtraction, "-"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
-    assert_eq!(result.unwrap(),
-               Token::new(TokenType::IntegerValue(0), Lexeme::default()));
+    assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(0), Lexeme::default()));
 }
-
 
 #[test]
 fn parse_expression_5() {
-    let lexeme = Lexeme::default();
-
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::IntegerValue(3), "3"),
-                                  Token::new_string(TokenType::Subtraction, "-"),
-                                  Token::new_string(TokenType::IntegerValue(1), "1")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::Subtraction, "-"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     let result = int.expression(None);
-    assert_eq!(result.unwrap(),
-               Token::new(TokenType::IntegerValue(2), Lexeme::default()));
+    assert_eq!(result.unwrap(), Token::new(TokenType::IntegerValue(2), Lexeme::default()));
 }
 
 #[test]
 fn parse_var_definition_expression_1() {
-    let lexeme = Lexeme::default();
-
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
     assert!(int.interpreter_state.variables.contains_key("x"));
-    assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token::new_string(TokenType::IntegerValue(2), "")));
+    assert_eq!(
+        int.interpreter_state.variables.get("x"),
+        Some(&Token::new_string(TokenType::IntegerValue(2), ""))
+    );
 }
 
 #[test]
@@ -855,46 +885,49 @@ fn is_operator_test() {
 
 #[test]
 fn parse_var_definition_expression_2() {
-    let lexeme = Lexeme::default();
-
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(7), "7"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(7), "7"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
     int.interpret();
     assert!(int.interpreter_state.variables.contains_key("x"));
-    assert_eq!(int.interpreter_state.variables.get("x"),
-               Some(&Token::new_string(TokenType::IntegerValue(9), "")));
+    assert_eq!(
+        int.interpreter_state.variables.get("x"),
+        Some(&Token::new_string(TokenType::IntegerValue(9), ""))
+    );
 }
 
 #[test]
 fn parse_var_definition_expression_3() {
-
     // var x: int := (1+3)*4
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  Token::new_string(TokenType::LParen, "("),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(3), "3"),
-                                  Token::new_string(TokenType::RParen, ")"),
-                                  Token::new_string(TokenType::Multiplication, "*"),
-                                  Token::new_string(TokenType::IntegerValue(4), "4"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::LParen, "("),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::RParen, ")"),
+        Token::new_string(TokenType::Multiplication, "*"),
+        Token::new_string(TokenType::IntegerValue(4), "4"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -905,18 +938,19 @@ fn parse_var_definition_expression_3() {
     assert_eq!(int.interpreter_state.variables.get("x"), Some(&expected_value));
 }
 
-
 #[test]
 fn parse_expression_3() {
     let lexeme = Lexeme::default();
     // (1+3)*4
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::LParen, "("),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(3), "3"),
-                                  Token::new_string(TokenType::RParen, ")"),
-                                  Token::new_string(TokenType::Multiplication, "*"),
-                                  Token::new_string(TokenType::IntegerValue(4), "4")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::LParen, "("),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::RParen, ")"),
+        Token::new_string(TokenType::Multiplication, "*"),
+        Token::new_string(TokenType::IntegerValue(4), "4"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -931,17 +965,19 @@ fn parse_expression_3() {
 fn parse_expression_4() {
     let lexeme = Lexeme::default();
     // (1+3)*4
-    let tokens: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                  Token::new_string(TokenType::Identifier, "x"),
-                                  Token::new_string(TokenType::TypeDeclaration, ":"),
-                                  Token::new_string(TokenType::IntegerType, "int"),
-                                  Token::new_string(TokenType::ValueDefinition, ":="),
-                                  Token::new_string(TokenType::IntegerValue(1), "1"),
-                                  Token::new_string(TokenType::Addition, "+"),
-                                  Token::new_string(TokenType::IntegerValue(3), "3"),
-                                  Token::new_string(TokenType::Multiplication, "*"),
-                                  Token::new_string(TokenType::IntegerValue(2), "2"),
-                                  Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::Addition, "+"),
+        Token::new_string(TokenType::IntegerValue(3), "3"),
+        Token::new_string(TokenType::Multiplication, "*"),
+        Token::new_string(TokenType::IntegerValue(2), "2"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
@@ -950,8 +986,7 @@ fn parse_expression_4() {
         int.interpret();
     }
 
-    assert_eq!(state.variables.get("x"),
-               Some(&Token::new_string(TokenType::IntegerValue(7), "")));
+    assert_eq!(state.variables.get("x"), Some(&Token::new_string(TokenType::IntegerValue(7), "")));
 }
 
 #[test]
@@ -968,17 +1003,20 @@ fn stateful_var_definition() {
     //let _ = simplelog::TermLogger::init(simplelog::LogLevelFilter::Trace, simplelog::Config::default());
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
 
-    let tokens1: Vec<Token> = vec![Token::new_string(TokenType::VarKeyword, "var"),
-                                   Token::new_string(TokenType::Identifier, "x"),
-                                   Token::new_string(TokenType::TypeDeclaration, ":"),
-                                   Token::new_string(TokenType::IntegerType, "int"),
-                                   Token::new_string(TokenType::StatementEnd, ";")];
+    let tokens1: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
-    let tokens2: Vec<Token> = vec![Token::new_string(TokenType::Identifier, "x"),
-                                   Token::new_string(TokenType::ValueDefinition, ":="),
-                                   val,
-                                   Token::new_string(TokenType::StatementEnd, ";")];
-
+    let tokens2: Vec<Token> = vec![
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        val,
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
 
     let mut state = InterpreterState::new();
     {
@@ -992,8 +1030,6 @@ fn stateful_var_definition() {
         let _ = int2.interpret();
     }
 
-
     assert!(state.variables.contains_key("x"));
-    assert_eq!(state.variables.get("x"),
-               Some(&Token::new_string(TokenType::IntegerValue(1), "1")));
+    assert_eq!(state.variables.get("x"), Some(&Token::new_string(TokenType::IntegerValue(1), "1")));
 }

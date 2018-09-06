@@ -1,24 +1,28 @@
-
-use lexer::lexeme::Lexeme;
 use lexer::lexeme::FromLexeme;
+use lexer::lexeme::Lexeme;
 use parser::token::Token;
 
 #[derive(Clone)]
 pub struct TokenIterator<I>
-    where I: Iterator<Item = Lexeme> {
+where
+    I: Iterator<Item = Lexeme>,
+{
     lex_iter: I,
 }
 
-impl<'a, I> TokenIterator<I> where I: Iterator<Item = Lexeme> {
+impl<'a, I> TokenIterator<I>
+where
+    I: Iterator<Item = Lexeme>,
+{
     pub fn new(it: I) -> TokenIterator<I> {
-        TokenIterator {
-            lex_iter: it
-        }
+        TokenIterator { lex_iter: it }
     }
 }
 
 impl<'a, I> Iterator for TokenIterator<I>
-    where I: Iterator<Item = Lexeme> {
+where
+    I: Iterator<Item = Lexeme>,
+{
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
@@ -29,9 +33,9 @@ impl<'a, I> Iterator for TokenIterator<I>
                 match x {
                     Ok(t) => Some(t),
                     Err(_) => {
-                        error!("{:?}",x);
+                        error!("{:?}", x);
                         None
-                    },
+                    }
                 }
             }
             None => None,

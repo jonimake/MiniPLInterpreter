@@ -4,38 +4,43 @@
 pub mod lexer;
 pub mod parser;
 
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate simplelog;
 extern crate structopt;
-#[macro_use] extern crate structopt_derive;
+#[macro_use]
+extern crate structopt_derive;
 
-use simplelog::LogLevelFilter;
 use simplelog::Config;
+use simplelog::LogLevelFilter;
 use simplelog::TermLogger;
 use structopt::StructOpt;
 
 use lexer::lexeme_iterator::LexemeIterator;
-use parser::token::Token;
-use parser::token_iterator::TokenIterator;
 use parser::interpreter::Interpreter;
 use parser::interpreter::InterpreterState;
+use parser::token::Token;
+use parser::token_iterator::TokenIterator;
 
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
-use std::io::BufReader;
 use std::env;
+use std::fs::File;
 use std::io;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::Path;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "MiniPLInterpreter")]
 struct Cli {
-    #[structopt(long = "inputpath", short = "i",
-    help="Path to file to be interpreted. If left empty, the program will wait for stdin to be interpreted.")]
+    #[structopt(
+        long = "inputpath",
+        short = "i",
+        help = "Path to file to be interpreted. If left empty, the program will wait for stdin to be interpreted."
+    )]
     input_path: Option<String>,
 
-    #[structopt(long = "loglevel", short="l")]
-    log_level: Option<LogLevel>
+    #[structopt(long = "loglevel", short = "l")]
+    log_level: Option<LogLevel>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -58,13 +63,12 @@ impl std::str::FromStr for LogLevel {
 
     fn from_str(text: &str) -> std::result::Result<Self, Self::Err> {
         match text {
-
             "info" => Result::Ok(LogLevel::Info),
             "warning" => Result::Ok(LogLevel::Warning),
             "debug" => Result::Ok(LogLevel::Debug),
             "trace" => Result::Ok(LogLevel::Trace),
             "error" => Result::Ok(LogLevel::Error),
-            _ => Result::Ok(LogLevel::Error)
+            _ => Result::Ok(LogLevel::Error),
         }
     }
 }
@@ -73,10 +77,10 @@ impl Into<LogLevelFilter> for LogLevel {
     fn into(self) -> LogLevelFilter {
         match self {
             LogLevel::Error => LogLevelFilter::Error,
-            LogLevel::Info  => LogLevelFilter::Info,
-            LogLevel::Warning  => LogLevelFilter::Warn,
+            LogLevel::Info => LogLevelFilter::Info,
+            LogLevel::Warning => LogLevelFilter::Warn,
             LogLevel::Debug => LogLevelFilter::Debug,
-            LogLevel::Trace => LogLevelFilter::Trace
+            LogLevel::Trace => LogLevelFilter::Trace,
         }
     }
 }
@@ -86,12 +90,8 @@ fn main() {
     let args = Cli::from_args();
     let ll = args.log_level;
     let level_filter: LogLevelFilter = match ll {
-        Some(level) => {
-            level.into()
-        },
-        _ => {
-            LogLevelFilter::Error
-        }
+        Some(level) => level.into(),
+        _ => LogLevelFilter::Error,
     };
     let _ = TermLogger::init(level_filter, Config::default());
 
@@ -108,36 +108,30 @@ fn main() {
     let exit_keyword = "exit";
     debug!("The file is {}", absolute_path.display());
 
-    match path.exists() && path.is_file() {
-        true => {
-            let f = File::open(path).unwrap();
-            let mut reader = BufReader::new(f);
-            let mut buffer = String::new();
-            reader.read_to_string(&mut buffer).unwrap();
-            info!("File read");
-            buffer.trim_left_matches("\u{feff}");
+    if path.exists() && path.is_file() {
+        let f = File::open(path).unwrap();
+        let mut reader = BufReader::new(f);
+        let mut buffer = String::new();
+        reader.read_to_string(&mut buffer).unwrap();
+        info!("File read");
+        buffer.trim_left_matches("\u{feff}");
 
-            let _ = eval_file(&buffer);
-        }
-        false => {
-            println!("Type commands");
-            println!("Type {:?} to exit", exit_keyword);
+        let _ = eval_file(&buffer);
+    } else {
+        println!("Type commands");
+        println!("Type {:?} to exit", exit_keyword);
 
-            loop {
-                print!("MiniPL> ");
-                io::stdout().flush().unwrap();
-                let mut input_text: String = String::new();
-                io::stdin()
-                    .read_line(&mut input_text)
-                    .expect("failed to read from stdin");
-                trace!("Read: {}", input_text);
-                io::stdout().flush().unwrap();
-                if input_text.to_string().trim() == exit_keyword {
-                    break;
-                }
-                eval_line(&input_text.to_string().trim() , &mut state);
-
+        loop {
+            print!("MiniPL> ");
+            io::stdout().flush().unwrap();
+            let mut input_text: String = String::new();
+            io::stdin().read_line(&mut input_text).expect("failed to read from stdin");
+            trace!("Read: {}", input_text);
+            io::stdout().flush().unwrap();
+            if input_text.to_string().trim() == exit_keyword {
+                break;
             }
+            eval_line(&input_text.to_string().trim(), &mut state);
         }
     };
 }
@@ -146,8 +140,7 @@ fn eval_file(file_contents: &str) -> Result<(), String> {
     let lexeme_it = LexemeIterator::new(file_contents);
     let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(lexeme_it);
     let mut state = InterpreterState::new();
-    let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>,
-                                           &mut state);
+    let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>, &mut state);
     interpreter.interpret()
 }
 
@@ -169,9 +162,7 @@ var X : int := 4 + (6 * 2);
 print X;
 "#;
     eval_file(code).unwrap();
-
 }
-
 
 #[test]
 fn sample2_loop_print() {
@@ -192,7 +183,6 @@ assert (x = (nTimes-1));
 "#;
     eval_file(code).unwrap();
 }
-
 
 #[test]
 fn sample4_decl_assign_print() {

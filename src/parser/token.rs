@@ -1,12 +1,12 @@
-use std::hash::Hash;
-use std::hash::Hasher;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 use lexer;
 use lexer::lexeme::Lexeme;
-use parser::token_type::TokenType;
 use lexer::lexeme::LexemeType;
+use parser::token_type::TokenType;
 
 #[derive(PartialEq, Clone)]
 pub struct Token {
@@ -32,7 +32,6 @@ impl Token {
     }
 }
 
-
 impl Default for Token {
     fn default() -> Token {
         Token {
@@ -49,7 +48,6 @@ impl fmt::Debug for Token {
         } else {
             write!(f, "{}", self.token_type)
         }
-
     }
 }
 
@@ -61,7 +59,7 @@ impl fmt::Display for Token {
 
 #[derive(Debug)]
 pub enum TokenParseError {
-    Fail(String)
+    Fail(String),
 }
 
 impl lexer::lexeme::FromLexeme for Token {
@@ -70,24 +68,44 @@ impl lexer::lexeme::FromLexeme for Token {
         let token = get_token(lx);
         match token {
             Ok(t) => Ok(t),
-            Err(msg) => Result::Err(TokenParseError::Fail(msg))
+            Err(msg) => Result::Err(TokenParseError::Fail(msg)),
         }
     }
 }
 
 fn get_token(lx: Lexeme) -> Result<Token, String> {
     match lx {
-        Lexeme { lexeme_type: LexemeType::SingleChar, .. } => get_single_char_token(lx),
-        Lexeme { lexeme_type: LexemeType::TwoChar, .. } => get_two_char_token(lx),
-        Lexeme { lexeme_type: LexemeType::Keyword, .. } => get_keyword_token(lx),
-        Lexeme { lexeme_type: LexemeType::Bool, .. } => get_bool_token(lx),
-        Lexeme { lexeme_type: LexemeType::Integer, .. } => get_integer_token(lx),
-        Lexeme { lexeme_type: LexemeType::Identifier, .. } => get_identifier_token(lx),
-        Lexeme { lexeme_type: LexemeType::StringLiteral, .. } => get_string_literal_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::SingleChar,
+            ..
+        } => get_single_char_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::TwoChar,
+            ..
+        } => get_two_char_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::Keyword,
+            ..
+        } => get_keyword_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::Bool,
+            ..
+        } => get_bool_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::Integer,
+            ..
+        } => get_integer_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::Identifier,
+            ..
+        } => get_identifier_token(lx),
+        Lexeme {
+            lexeme_type: LexemeType::StringLiteral,
+            ..
+        } => get_string_literal_token(lx),
         _ => Err(format!("Invalid token:{:?}", lx)),
     }
 }
-
 
 fn get_string_literal_token(lx: Lexeme) -> Result<Token, String> {
     let mut hasher = DefaultHasher::new();
@@ -118,12 +136,8 @@ fn get_bool_token(lx: Lexeme) -> Result<Token, String> {
 
 fn get_two_char_token(lx: Lexeme) -> Result<Token, String> {
     match lx.lexeme.to_lowercase().as_ref() {
-        ".." => {
-            Ok(Token::new(TokenType::RangeDots, lx))
-        }
-        ":=" => {
-            Ok(Token::new(TokenType::ValueDefinition, lx))
-        }
+        ".." => Ok(Token::new(TokenType::RangeDots, lx)),
+        ":=" => Ok(Token::new(TokenType::ValueDefinition, lx)),
         _ => Err(format!("Invalid token:{:?}", lx)),
     }
 }
@@ -144,7 +158,7 @@ fn get_keyword_token(lx: Lexeme) -> Result<Token, String> {
         "bool" => Ok(Token::new(TokenType::BooleanType, lx)),
         "true" => Ok(Token::new(TokenType::BooleanValue(true), lx)),
         "false" => Ok(Token::new(TokenType::BooleanValue(false), lx)),
-        _ => Err(format!("Invalid token:{:?}", lx))
+        _ => Err(format!("Invalid token:{:?}", lx)),
     }
 }
 
@@ -163,6 +177,6 @@ fn get_single_char_token(lx: Lexeme) -> Result<Token, String> {
         ";" => Ok(Token::new(TokenType::StatementEnd, lx)),
         "." => Ok(Token::new(TokenType::Stop, lx)),
         ":" => Ok(Token::new(TokenType::TypeDeclaration, lx)),
-        _ => Err(format!("Invalid token:{:?}", lx))
+        _ => Err(format!("Invalid token:{:?}", lx)),
     }
 }
