@@ -1,3 +1,5 @@
+#![feature(rust_2018_preview, uniform_paths)]
+
 #![allow(unknown_lints)]
 #![warn(clippy)]
 
