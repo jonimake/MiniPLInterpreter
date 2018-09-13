@@ -3,9 +3,9 @@ use std::iter::Peekable;
 use std::result::Result;
 use std::vec::Vec;
 
-use lexer::lexeme::Lexeme;
-use parser::token::Token;
-use parser::token_type::TokenType;
+use crate::lexer::lexeme::Lexeme;
+use crate::parser::token::Token;
+use crate::parser::token_type::TokenType;
 
 type TokenIteratorType<'a> = &'a mut Iterator<Item = Token>;
 
@@ -651,9 +651,9 @@ fn parse_var_definition_2() {
 
 #[test]
 fn parse_var_declaration() {
-    let xtoken = Token::new_string(TokenType::Identifier, "x");
+    let _xtoken = Token::new_string(TokenType::Identifier, "x");
     let tokentype = Token::new_string(TokenType::IntegerType, "int");
-    let lexeme = Lexeme::default();
+    let _lexeme = Lexeme::default();
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::VarKeyword, "var"),
         Token::new_string(TokenType::Identifier, "x"),
@@ -672,9 +672,9 @@ fn parse_var_declaration() {
 
 #[test]
 fn parse_print_string_integer() {
-    let lexeme = Lexeme::default();
-    let id = Token::new_string(TokenType::Identifier, "x");
-    let val = Token::new_string(TokenType::IntegerValue(1), "1");
+    let _lexeme = Lexeme::default();
+    let _id = Token::new_string(TokenType::Identifier, "x");
+    let _val = Token::new_string(TokenType::IntegerValue(1), "1");
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::Print, "print"),
         Token::new_string(TokenType::IntegerValue(23), "23"),
@@ -690,9 +690,9 @@ fn parse_print_string_integer() {
 
 #[test]
 fn parse_print_string_literal() {
-    let lexeme = Lexeme::default();
-    let id = Token::new_string(TokenType::Identifier, "x");
-    let val = Token::new_string(TokenType::IntegerValue(1), "1");
+    let _lexeme = Lexeme::default();
+    let _id = Token::new_string(TokenType::Identifier, "x");
+    let _val = Token::new_string(TokenType::IntegerValue(1), "1");
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::Print, "print"),
         Token::new_string(TokenType::StringLiteral(0), "foobar"),
@@ -709,7 +709,7 @@ fn parse_print_string_literal() {
 
 #[test]
 fn parse_print_complicated() {
-    let lexeme = Lexeme::default();
+    let _lexeme = Lexeme::default();
     let id = Token::new_string(TokenType::Identifier, "x");
     let val = Token::new_string(TokenType::IntegerValue(1), "1");
     let tokens: Vec<Token> = vec![
@@ -736,7 +736,7 @@ fn parse_print_complicated() {
 
 #[test]
 fn parse_expression_1() {
-    let lexeme = Lexeme::default();
+    let _lexeme = Lexeme::default();
 
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::IntegerValue(1), "1"),
@@ -766,7 +766,7 @@ fn parse_assert() {
     let mut iter = tokens.into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
-    let result = int.assert().unwrap();
+    let _result = int.assert().unwrap();
 }
 
 #[test]
@@ -816,7 +816,7 @@ fn evaluate_postfix_equality() {
     let mut iter = vec![].into_iter();
     let mut state = InterpreterState::new();
     let mut int = Interpreter::new(&mut iter, &mut state);
-    let result = int.evaluate_postfix(&mut tokens).unwrap();
+    let _result = int.evaluate_postfix(&mut tokens).unwrap();
 }
 
 #[test]
@@ -940,7 +940,7 @@ fn parse_var_definition_expression_3() {
 
 #[test]
 fn parse_expression_3() {
-    let lexeme = Lexeme::default();
+    let _lexeme = Lexeme::default();
     // (1+3)*4
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::LParen, "("),
@@ -963,7 +963,7 @@ fn parse_expression_3() {
 
 #[test]
 fn parse_expression_4() {
-    let lexeme = Lexeme::default();
+    let _lexeme = Lexeme::default();
     // (1+3)*4
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::VarKeyword, "var"),

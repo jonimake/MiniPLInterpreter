@@ -1,4 +1,7 @@
+cargo-features = ["edition"]
+
 [package]
+edition = "2018"
 name = "mini_pli_interpreter"
 version = "0.1.0"
 authors = ["Joni Mäkelä <joni.makela@gmail.com>"]

@@ -1,6 +1,6 @@
-use lexer::lexeme::FromLexeme;
-use lexer::lexeme::Lexeme;
-use parser::token::Token;
+use crate::lexer::lexeme::FromLexeme;
+use crate::lexer::lexeme::Lexeme;
+use crate::parser::token::Token;
 
 #[derive(Clone)]
 pub struct TokenIterator<I>

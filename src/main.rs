@@ -1,4 +1,4 @@
-#![feature(rust_2018_preview, uniform_paths)]
+#![feature(uniform_paths)]
 
 #![allow(unknown_lints)]
 #![warn(clippy)]
@@ -18,11 +18,11 @@ use simplelog::LogLevelFilter;
 use simplelog::TermLogger;
 use structopt::StructOpt;
 
-use lexer::lexeme_iterator::LexemeIterator;
-use parser::interpreter::Interpreter;
-use parser::interpreter::InterpreterState;
-use parser::token::Token;
-use parser::token_iterator::TokenIterator;
+use crate::lexer::lexeme_iterator::LexemeIterator;
+use crate::parser::interpreter::Interpreter;
+use crate::parser::interpreter::InterpreterState;
+use crate::parser::token::Token;
+use crate::parser::token_iterator::TokenIterator;
 
 use std::env;
 use std::fs::File;

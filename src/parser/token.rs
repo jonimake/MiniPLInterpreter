@@ -3,10 +3,10 @@ use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use lexer;
-use lexer::lexeme::Lexeme;
-use lexer::lexeme::LexemeType;
-use parser::token_type::TokenType;
+use crate::lexer;
+use crate::lexer::lexeme::Lexeme;
+use crate::lexer::lexeme::LexemeType;
+use crate::parser::token_type::TokenType;
 
 #[derive(PartialEq, Clone)]
 pub struct Token {
