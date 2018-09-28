@@ -4,6 +4,14 @@ name = "mini_pli_interpreter"
 version = "0.1.0"
 authors = ["Joni Mäkelä <joni.makela@gmail.com>"]
 
+[lib]
+name = "minipliinterpreter"
+path = "src/lib.rs"
+
+[[bin]]
+name = "minipliinterpreterbin"
+path = "src/main.rs"
+
 [dependencies]
 log = "0.3.8"
 simplelog = "0.4.2"
