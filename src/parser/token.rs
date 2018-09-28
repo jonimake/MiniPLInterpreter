@@ -42,7 +42,7 @@ impl Default for Token {
 }
 
 impl fmt::Debug for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(t) = self.lexeme.clone() {
             write!(f, "{}, '{}', [line {}, column {}]", self.token_type, t.lexeme, t.line, t.column)
         } else {
@@ -52,7 +52,7 @@ impl fmt::Debug for Token {
 }
 
 impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.token_type)
     }
 }

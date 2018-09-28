@@ -45,7 +45,7 @@ pub enum TokenType {
 }
 
 impl fmt::Display for TokenType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             TokenType::IntegerValue(integer) => write!(f, "{}", integer),
             TokenType::BooleanValue(boolean) => write!(f, "{}", boolean),

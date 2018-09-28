@@ -36,7 +36,7 @@ pub trait FromLexeme: Sized {
 }
 
 impl fmt::Display for Lexeme {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\t ({}:{})\t [{:?}]", self.lexeme, self.line, self.column, self.lexeme_type)
     }
 }

@@ -1,15 +1,15 @@
-#![feature(uniform_paths)]
+#![feature(uniform_paths, tool_lints)]
 
 #![allow(unknown_lints)]
-#![warn(clippy)]
+#![warn(clippy::all)]
 
 pub mod lexer;
 pub mod parser;
 
 #[macro_use]
 extern crate log;
-extern crate simplelog;
-extern crate structopt;
+use simplelog;
+use structopt;
 #[macro_use]
 extern crate structopt_derive;
 
@@ -88,7 +88,7 @@ impl Into<LogLevelFilter> for LogLevel {
 }
 
 fn main() {
-    let _example = 1230000000;
+    let _example = 1_230_000_000;
     let args = Cli::from_args();
     let ll = args.log_level;
     let level_filter: LogLevelFilter = match ll {
@@ -140,20 +140,19 @@ fn main() {
 
 fn eval_file(file_contents: &str) -> Result<(), String> {
     let lexeme_it = LexemeIterator::new(file_contents);
-    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(lexeme_it);
+    let mut token_iterator: TokenIterator<LexemeIterator<'_>> = TokenIterator::new(lexeme_it);
     let mut state = InterpreterState::new();
-    let mut interpreter = Interpreter::new(&mut token_iterator as &mut Iterator<Item = Token>, &mut state);
+    let mut interpreter = Interpreter::new(&mut token_iterator as &mut dyn Iterator<Item = Token>, &mut state);
     interpreter.interpret()
 }
 
 fn eval_line(line: &str, mut state: &mut InterpreterState) {
     debug!("{:?}", line);
     let it = LexemeIterator::new(line);
-    let mut token_iterator: TokenIterator<LexemeIterator> = TokenIterator::new(it);
+    let mut token_iterator: TokenIterator<LexemeIterator<'_>> = TokenIterator::new(it);
     let mut interpreter = Interpreter::new(&mut token_iterator, &mut state);
-    match interpreter.interpret() {
-        Err(msg) => error!("{}", msg),
-        _ => {}
+    if let Err(msg) = interpreter.interpret() {
+        error!("{}", msg)
     }
 }
 

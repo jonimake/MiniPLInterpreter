@@ -55,7 +55,7 @@ impl<'a> Clone for LexemeIterator<'a> {
 impl<'a> LexemeIterator<'a> {
     //type Item = str;
 
-    pub fn new(string: &'a str) -> LexemeIterator {
+    pub fn new(string: &'a str) -> LexemeIterator<'_> {
         let lexeme_matchers: LexemeMatcherType = vec![
             (LexemeType::StringLiteral, is_string_literal),
             (LexemeType::Keyword, is_keyword_lexeme),
@@ -67,7 +67,7 @@ impl<'a> LexemeIterator<'a> {
         ];
         let src = string.trim_left_matches("\u{feff}"); //strip BOM
 
-        let t = LexemeIterator {
+        LexemeIterator {
             initialized: false,
             text: src,
             lexeme_matchers,
@@ -76,8 +76,7 @@ impl<'a> LexemeIterator<'a> {
             slice_start: 0,
             current_line_number: 1,
             current_line_char_pos: 0,
-        };
-        t
+        }
     }
 
     fn handle_end_of_line(&mut self) -> bool {
@@ -126,7 +125,7 @@ impl<'a> Iterator for LexemeIterator<'a> {
         let mut lexeme_type = LexemeType::NA;
         let mut longest_lexeme = usize::MIN;
 
-        for column in self.current_line_char_pos..self.current_line.len() + 1 {
+        for column in self.current_line_char_pos ..= self.current_line.len() {
             //println!("{}",self.current_line.chars().nth(column).unwrap_or(' '));
             unsafe {
                 lexeme_candidate = self.current_line.get_unchecked(self.current_line_char_pos .. column);

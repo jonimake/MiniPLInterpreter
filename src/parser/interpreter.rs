@@ -7,7 +7,7 @@ use crate::lexer::lexeme::Lexeme;
 use crate::parser::token::Token;
 use crate::parser::token_type::TokenType;
 
-type TokenIteratorType<'a> = &'a mut Iterator<Item = Token>;
+type TokenIteratorType<'a> = &'a mut dyn Iterator<Item = Token>;
 
 #[derive(Debug, Clone)]
 #[derive(Default)]
@@ -432,8 +432,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                 panic!("Stack length wasn't 1, error occurred");
             }
         } else {
-            let result = Ok(stack[0].clone());
-            return result;
+            Ok(stack[0].clone())
         }
     }
 }
