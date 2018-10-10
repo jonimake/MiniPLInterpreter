@@ -19,6 +19,10 @@ clap = "2.22.2"
 fern = "0.4.0"
 structopt = "0.1.0"
 structopt-derive = "0.1.0"
+print-flat-tree = "*"
+rustc-serialize = "*"
+term-painter = "*"
+dot = "0.1.4"
 
 [dev-dependencies]
 cargo-watch = "5.0.1"

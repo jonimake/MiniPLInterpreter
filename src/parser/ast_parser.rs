@@ -1,61 +1,44 @@
+#[allow(unused)]
+
 use ::std::collections::HashMap;
 use ::std::iter::Peekable;
 use ::std::vec::Vec;
+use ::std::collections::hash_map::DefaultHasher;
+use ::std::hash::{Hash, Hasher};
+use ::std::convert::TryFrom;
 
 use crate::lexer::lexeme::Lexeme;
 use crate::parser::token::Token;
 use crate::parser::token_type::TokenType;
+use crate::ast::*;
 
 type TokenIteratorType<'a> = &'a mut dyn Iterator<Item = Token>;
-
-#[derive(Debug, Clone)]
-#[derive(Default)]
-pub struct InterpreterState {
-    pub variables: HashMap<String, Token>,
-    pub string_cache: HashMap<u64, String>,
-}
-
-impl InterpreterState {
-    pub fn new() -> InterpreterState {
-        InterpreterState {
-            variables: HashMap::new(),
-            string_cache: HashMap::new(),
-        }
-    }
-
-    pub fn with_string_cache(string_cache: HashMap<u64, String>) -> InterpreterState {
-        InterpreterState {
-            variables: HashMap::new(),
-            string_cache
-        }
-    }
-}
 
 enum Err {
     ParseError(String),
     UnexpectedToken(String),
 }
 
-pub struct Interpreter<'a, 'b: 'a> {
-    interpreter_state: &'b mut InterpreterState,
+pub struct AstParser<'a> {
+    //interpreter_state: &'b mut InterpreterState,
     iterator: Peekable<TokenIteratorType<'a>>,
-    errors: Vec<Err>,
+    //errors: Vec<Err>,
 }
 
-impl<'a, 'b: 'a> Interpreter<'a, 'b> {
-    pub fn new(iter: TokenIteratorType<'a>, state: &'b mut InterpreterState) -> Interpreter<'a, 'b> {
-        Interpreter {
-            interpreter_state: state,
-            iterator: iter.peekable(),
-            errors: Vec::new(),
+impl<'a> AstParser<'a> {
+    pub fn new(iter: TokenIteratorType<'a>) -> AstParser<'a> {
+        AstParser {
+            iterator: iter.peekable()
         }
     }
 
-    pub fn interpret(&mut self) -> Result<(), String> {
+    pub fn build_ast(&mut self) -> Result<Ast, String> {
+        let mut statements: Vec<Statement> = Vec::new();
         while self.iterator.peek().cloned().is_some() {
-            self.statement()?
+            let stmt = self.statement()?;
+            statements.push(stmt);
         }
-        Ok(())
+        Ok(Ast::Statements(statements))
     }
 
     /*
@@ -66,26 +49,24 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
    stmt    -> print expr                           {print}
    stmt    -> assert ( expr )                      {assert}
    */
-    fn statement(&mut self) -> Result<(), String> {
-        let next = self.iterator.peek().cloned();
-        if let Some(tt) = next {
-            trace!("statement token {:?}", tt.clone());
-            match tt.token_type {
-                TokenType::VarKeyword => self.var_decl()?,
-                TokenType::Identifier => self.id_assign()?,
-                TokenType::For => self.for_loop()?,
-                TokenType::Read => self.read()?,
-                TokenType::Print => self.print()?,
-                TokenType::Assert => self.assert()?,
-                t @ _ => return Err(format!("Unexpected token in statement parsing {:?}", t)),
-            };
+    fn statement(&mut self) -> Result<Statement, String> {
+        let next: Option<Token> = self.iterator.peek().cloned();
+        let tt: Token = next.unwrap();
+        let statement = match tt.token_type {
+            TokenType::VarKeyword => self.var_decl(),
+            TokenType::Identifier => self.id_assign(),
+            TokenType::For => self.for_loop(),
+            TokenType::Read => self.read(),
+            TokenType::Print => self.print(),
+            TokenType::Assert => self.assert(),
+            t @ _ => Err(format!("Unexpected token in statement parsing {:?}", t)),
+        };
+        self.expect_next(TokenType::StatementEnd)?;
+        statement
 
-            self.expect_next(TokenType::StatementEnd)?;
-        }
-        Ok(())
     }
 
-    fn read(&mut self) -> Result<(), String> {
+    fn read(&mut self) -> Result<Statement, String> {
         let tokens: (Token, Token) = {
             let _ = self.expect_next(TokenType::Read)?;
             let id = self.expect_next(TokenType::Identifier)?;
@@ -143,150 +124,110 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             (id, t)
         };
         self.set_variable_value(tokens.0, tokens.1);
-        Ok(())
+        Ok(Statement::Read(Id("todo".to_owned())))
     }
 
-    fn assert(&mut self) -> Result<(), String> {
+    fn assert(&mut self) -> Result<Statement, String> {
         self.expect_next(TokenType::Assert)?;
-        let assert_value = self.expression(None)?;
-        match assert_value {
-            Token {
-                token_type: TokenType::BooleanValue(true),
-                ..
-            } => Ok(()),
-            Token {
-                token_type: TokenType::BooleanValue(false),
-                ..
-            } => Err("assertion error".to_string()),
-            _ => Err("error evaluating assertion value".to_string()),
-        }
+        let expr = self.expression(None)?;
+        Ok(Statement::Assert(expr))
     }
 
-    fn for_loop(&mut self) -> Result<(), String> {
+    fn for_loop(&mut self) -> Result<Statement, String> {
         self.expect_next(TokenType::For)?;
         let loop_id = self.expect_next(TokenType::Identifier)?;
+        let lex = loop_id.lexeme.unwrap();
+
         self.expect_next(TokenType::In)?;
-        let range_start: Token = self.expression(Some(TokenType::RangeDots))?;
-        self.set_variable_value(loop_id.clone(), range_start.clone());
+        let range_start = self.expression(Some(TokenType::RangeDots))?;
+
         self.expect_next(TokenType::RangeDots)?;
-        let range_end: Token = self.expression(Some(TokenType::Do))?;
+        let range_end = self.expression(Some(TokenType::Do))?;
 
         self.expect_next(TokenType::Do)?;
         //read all tokens until end for
-        let mut all_tokens: Vec<Token> = Vec::new();
+        let mut for_loop_tokens: Vec<Token> = Vec::new();
 
         loop {
-            let next = self.iterator.next();
+            let next: Option<Token> = self.iterator.next();
             if let Some(tt) = next {
                 if tt.token_type == TokenType::End {
                     self.expect_next(TokenType::For)?;
                     break;
                 } else {
-                    all_tokens.push(tt);
+                    for_loop_tokens.push(tt);
                 }
             } else {
                 break;
             }
         }
+        let mut t_iter = for_loop_tokens.into_iter();
+        let mut loop_parser = AstParser::new(&mut t_iter);
+        let ast = loop_parser.build_ast()?;
 
-        match (range_start, range_end) {
-            (
-                Token {
-                    token_type: TokenType::IntegerValue(start_int),
-                    ..
-                },
-                Token {
-                    token_type: TokenType::IntegerValue(end_int),
-                    ..
-                },
-            ) => {
-                for x in start_int..end_int + 1 {
-                    trace!("loop {}", x);
-                    let mut token_iter = all_tokens.clone().into_iter();
-                    //not sure if doing something incredibly dirty
-                    self.set_variable_value(loop_id.clone(), Token::new(TokenType::IntegerValue(x), Lexeme::default()));
-
-                    debug!("state before interpret: {:?}", self.interpreter_state);
-                    {
-                        let mut int = Interpreter::new(&mut token_iter, &mut self.interpreter_state);
-                        int.interpret()?;
-                    }
-                    debug!("state after interpret: {:?}", self.interpreter_state);
-                }
-            }
-            _ => return Err("Ranges not implemented for other than Integer starts and ends".to_string()),
-        }
-        Ok(())
+        let statement = Statement::ForLoop(Id(lex.lexeme.to_owned()),
+                           range_start,
+                           range_end,
+                           Box::new(ast)); //todo
+        Ok(statement)
     }
 
     fn set_variable_value(&mut self, name: Token, token: Token) {
         let name_lexeme = name.lexeme.unwrap();
         debug!("set {:?} => {}", name_lexeme.lexeme, token);
-        self.interpreter_state.variables.insert(name_lexeme.lexeme.to_string(), token);
     }
 
     fn get_variable_value(&self, name: &Token) -> Option<Token> {
         let name_lexeme = name.clone().lexeme.unwrap();
         let name: String = name_lexeme.lexeme.to_string();
-        match self.interpreter_state.variables.get(&name) {
-            Some(t) => {
-                trace!("get {:?} = {:?}", name, t.clone());
-                Some(t.clone())
-            }
-            None => {
-                trace!("get {:?} = None", name);
-                None
-            }
-        }
+        None
     }
 
-    fn id_assign(&mut self) -> Result<(), String> {
+    fn id_assign(&mut self) -> Result<Statement, String> {
         let id = self.expect_next(TokenType::Identifier)?;
         self.expect_peek(TokenType::ValueDefinition);
-        self.assign(id)?;
-        Ok(())
+        let assignment = self.assign(id.clone())?;
+        let lex = id.lexeme.unwrap();
+        let statement = Statement::IdAssign(Id(lex.lexeme), Expression::ScalarExpression(Scalar::Int(0))); //todo
+        Ok(statement)
     }
 
-    fn var_decl(&mut self) -> Result<(), String> {
+    fn var_decl(&mut self) -> Result<Statement, String> {
         self.expect_next(TokenType::VarKeyword)?;
         let id: Token = self.expect_next(TokenType::Identifier)?;
+
         self.expect_next(TokenType::TypeDeclaration)?;
-        let tokentype = self.iterator.next().unwrap();
-        self.set_variable_value(id.clone(), tokentype);
-        if self.expect_peek(TokenType::ValueDefinition) {
-            return self.assign(id);
-        }
-        Ok(())
+        let tokentype: Token = self.iterator.next().unwrap();
+
+        let parsed_type = Type::try_from(tokentype)?;
+        let lex = id.lexeme.unwrap();
+        let statement = if self.expect_peek(TokenType::ValueDefinition) {
+            self.expect_next(TokenType::ValueDefinition)?;
+            let expr = self.expression(None)?;
+            Statement::VarDefn(Id(lex.lexeme), parsed_type, expr)
+        } else {
+            Statement::VarDecl(Id(lex.lexeme), parsed_type)
+        };
+
+        Ok(statement)
     }
 
-    fn assign(&mut self, id: Token) -> Result<(), String> {
+    fn assign(&mut self, id: Token) -> Result<Statement, String> {
         self.expect_next(TokenType::ValueDefinition)?;
-        let expression_value: Token = self.expression(None)?;
-        self.set_variable_value(id, expression_value);
-        Ok(())
+        let expression = self.expression(None)?;
+        let lex = id.lexeme.unwrap();
+        let statement = Statement::VarDefn(Id(lex.lexeme), Type::Int, expression); //todo
+        Ok(statement)
     }
 
-    fn print(&mut self) -> Result<(), String> {
+    fn print(&mut self) -> Result<Statement, String> {
         let _ = self.expect_next(TokenType::Print)?;
 
-        let token = self.expression(None)?;
-        let tt: TokenType = token.token_type;
-        match tt {
-            TokenType::Identifier => {
-                let var_val = self.get_variable_value(&token);
-                match var_val {
-                    Some(var) => println!("{} => {}", token.lexeme.unwrap().lexeme, var),
-                    None => println!("{} => None", token.lexeme.unwrap().lexeme),
-                };
-            }
-            TokenType::StringLiteral(hash) => {
-                println!("{}", self.interpreter_state.string_cache.get(&hash).unwrap_or(&"''".to_string()));
-            }
-            t @ _ => println!("{}", t),
-        }
-        Ok(())
+        let expr = self.expression(None)?;
+        let statement = Statement::Print(expr);
+        Ok(statement)
     }
-    fn expression(&mut self, terminator_symbol: Option<TokenType>) -> Result<Token, String> {
+    fn expression(&mut self, terminator_symbol: Option<TokenType>) -> Result<Expression, String> {
         let mut all_tokens: Vec<Token> = Vec::new();
         loop {
             let token = self
@@ -351,7 +292,50 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             output.push(token);
         }
 
-        self.evaluate_postfix(&mut output)
+        self.postfix_to_expr(&mut output)
+    }
+
+    fn postfix_to_expr(&mut self, tokens: &mut Vec<Token>) -> Result<Expression, String> {
+        let mut stack: Vec<Expression> = Vec::new();
+        tokens.reverse();
+        let debug: Vec<TokenType> = tokens.iter().map(|t| {
+            t.token_type
+        }).collect();
+
+        while let Some(next_token) = tokens.pop() {
+            if is_operator(&next_token) {
+                let operator_token_type = next_token.token_type;
+                if operator_token_type == TokenType::Negation {
+                    let t = tokens.pop().unwrap();
+                    let op = Operator::try_from(next_token)?;
+                    let result = Expression::Unary(op, Box::new(stack.pop().unwrap()));
+                    stack.push(result);
+                    unimplemented!()
+                } else {
+                    let t1 = stack.pop();
+                    let t2 = stack.pop();
+                    let t1 = t1.unwrap();
+                    let t2 = t2.unwrap();
+                    let operator: Operator = Operator::try_from(next_token)?;
+                    let result = Expression::Binary(Box::new(t2), operator, Box::new(t1));
+                    stack.push(result);
+                }
+            } else {
+                let scalar = Scalar::try_from(next_token)?;
+                stack.push(Expression::ScalarExpression(scalar));
+            }
+        }
+
+        if stack.len() != 1 {
+            error!("Stack: {:?}", stack);
+            if stack.is_empty() {
+                Err("Expected input while it was empty".to_string())
+            } else {
+                panic!("Stack length wasn't 1, error occurred");
+            }
+        } else {
+            Ok(stack[0].clone())
+        }
     }
 
     fn expect_next(&mut self, tt: TokenType) -> Result<Token, String> {
@@ -361,7 +345,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
             if token.token_type == tt {
                 return Ok(token);
             } else {
-                return Err(format!("\nUnexpected token {:?},\nexpected type {:?}\n", token, tt));
+                return Err(format!("Unexpected token {:?}, expected type {:?}", token, tt));
             }
         }
         Err("Expected token but iterator was empty".to_string())
@@ -374,75 +358,8 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
         }
         false
     }
-
-    fn evaluate_postfix(&mut self, tokens: &mut Vec<Token>) -> Result<Token, String> {
-        let mut stack: Vec<Token> = Vec::new();
-
-        trace!("eval tokens {:?}", tokens.clone());
-        fn binary_op(t1: &Token, t2: &Token, operator_token_type: &TokenType) -> Result<Token, String> {
-            let type1 = t1.token_type;
-            let type2 = t2.token_type;
-            debug!("types = {:?}, {:?}", type1, type2);
-            match (type1, type2) {
-                (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(a, b, *operator_token_type),
-                t => Err(format!("Binary operation {:?} not defined for types {:?}", operator_token_type, t)),
-            }
-        }
-
-        tokens.reverse();
-        while let Some(next_token) = tokens.pop() {
-            if is_operator(&next_token) {
-                let operator_token_type = next_token.token_type;
-                if operator_token_type == TokenType::Negation {
-                    let _ = tokens.pop();
-                    unimplemented!();
-                } else {
-                    let t1 = stack.pop();
-                    let t2 = stack.pop();
-
-                    if t1.is_none() || t2.is_none() {
-                        return Err("Expected token, found none".to_string());
-                    }
-
-                    let t1 = t1.unwrap();
-                    let t2 = t2.unwrap();
-
-                    let result: Token = match (t1.token_type, t2.token_type) {
-                        (TokenType::IntegerValue(a), TokenType::IntegerValue(b)) => binary_integer_op(b, a, operator_token_type)?,
-                        (TokenType::Identifier, TokenType::Identifier) => {
-                            let a = self.get_variable_value(&t1).unwrap();
-                            let b = self.get_variable_value(&t2).unwrap();
-                            binary_op(&a, &b, &operator_token_type)?
-                        }
-                        (TokenType::Identifier, _) => binary_op(&t2, &self.get_variable_value(&t1).unwrap(), &operator_token_type)?,
-                        (_, TokenType::Identifier) => binary_op(&self.get_variable_value(&t2).unwrap(), &t1, &operator_token_type)?,
-                        (TokenType::StringLiteral(_), TokenType::StringLiteral(_)) => {
-                            Token::new(TokenType::StringLiteral(0), Lexeme::default())
-                        }
-                        (TokenType::BooleanValue(a), TokenType::BooleanValue(b)) => match operator_token_type {
-                            TokenType::Equal => Token::new(TokenType::BooleanValue(a == b), Lexeme::default()),
-                            _ => return Err("Only equality is implemented for boolean tokens".to_string()),
-                        },
-                        _ => return Err(format!("Unimplemented for tokens {:?} and {:?}", t1, t2)),
-                    };
-                    stack.push(result);
-                }
-            } else {
-                stack.push(next_token);
-            }
-        }
-        if stack.len() != 1 {
-            error!("Stack: {:?}", stack);
-            if stack.is_empty() {
-                Err("Expected input while it was empty".to_string())
-            } else {
-                panic!("Stack length wasn't 1, error occurred");
-            }
-        } else {
-            Ok(stack[0].clone())
-        }
-    }
 }
+
 
 fn is_operator(token: &Token) -> bool {
     let token_type = token.token_type;
@@ -486,6 +403,86 @@ fn precedence_equal_or_less_than(x: TokenType, y: TokenType) -> bool {
 }
 
 #[test]
+fn parse_var_decl() {
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut ast_parser = AstParser::new(&mut iter);
+    let ast = ast_parser.build_ast();
+
+    let stmt = vec![Statement::VarDecl(Id("x".to_owned()), Type::Int)];
+    assert_eq!(Ok(Ast::Statements(stmt)), ast);
+}
+
+
+
+#[test]
+fn parse_var_definition() {
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::IntegerType, "int"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut ast_parser = AstParser::new(&mut iter);
+    let ast = ast_parser.build_ast();
+
+    let stmt = vec![Statement::VarDefn(Id("x".to_owned()), Type::Int, Expression::ScalarExpression(Scalar::Int(1)))];
+    assert_eq!(Ok(Ast::Statements(stmt)), ast);
+}
+
+#[test]
+fn parse_var_definition_2() {
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::VarKeyword, "var"),
+        Token::new_string(TokenType::Identifier, "x"),
+        Token::new_string(TokenType::TypeDeclaration, ":"),
+        Token::new_string(TokenType::StringType, "string"),
+        Token::new_string(TokenType::ValueDefinition, ":="),
+        Token::new_string(TokenType::StringLiteral(0), "\"foobar\""),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut ast_parser = AstParser::new(&mut iter);
+    let ast = ast_parser.build_ast();
+    let stmt = vec![
+        Statement::VarDefn(Id("x".to_owned()), Type::Str, Expression::ScalarExpression(Scalar::Str("\"foobar\"".to_owned())))
+    ];
+    assert_eq!(Ok(Ast::Statements(stmt)), ast);
+}
+
+#[test]
+fn parse_expression() {
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::IntegerValue(2), "2"),
+        Token::new_string(TokenType::Subtraction, "-"),
+        Token::new_string(TokenType::IntegerValue(1), "1"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut int = AstParser::new(&mut iter);
+    let result = int.expression(None);
+    assert_eq!(result, Ok(Expression::Binary(
+        Box::new(Expression::ScalarExpression(Scalar::Int(2))),
+        Operator::Sub,
+        Box::new(Expression::ScalarExpression(Scalar::Int(1)))
+    )))
+}
+
+
+#[test]
 fn evaluate_postfix_simple_addition() {
     let mut tokens: Vec<Token> = vec![
         Token::new_string(TokenType::IntegerValue(1), "1"),
@@ -494,11 +491,14 @@ fn evaluate_postfix_simple_addition() {
     ];
 
     let mut iter = vec![].into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
+    let mut ast_builder = AstParser::new(&mut iter);
 
-    let res = int.evaluate_postfix(&mut tokens);
-    assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(3));
+    let result = ast_builder.postfix_to_expr(&mut tokens);
+    assert_eq!(result, Ok(Expression::Binary(
+        Box::new(Expression::ScalarExpression(Scalar::Int(1))),
+        Operator::Add,
+        Box::new(Expression::ScalarExpression(Scalar::Int(2)))
+    )))
 }
 
 #[test]
@@ -523,18 +523,38 @@ fn for_loop_test() {
         Token::new_string(TokenType::StatementEnd, ";"),
     ];
     let mut iter = tokens.into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
-    let foo: Result<(), String> = int.for_loop();
-    assert_eq!(Ok(()), foo);
-    assert_eq!(
-        int.interpreter_state.variables.get("x"),
-        Some(&Token {
-            token_type: TokenType::IntegerValue(3),
-            lexeme: Some(Lexeme::default())
-        })
-    );
+    let mut ast_builder = AstParser::new(&mut iter);
+    let result: Result<Statement, String> = ast_builder.for_loop();
+    let inner_ast: Box<Ast> = Box::new(Ast::Statements(vec![
+        Statement::Print(Expression::ScalarExpression(Scalar::Var(Id("x".to_owned()))))
+    ]));
+    assert_eq!(result,
+               Ok(Statement::ForLoop(
+                Id("x".to_owned()),
+                Expression::ScalarExpression(Scalar::Int(0)),
+                Expression::ScalarExpression(Scalar::Int(3)), inner_ast)));
+
+    println!("{:?}", result.unwrap());
 }
+
+#[test]
+fn print_string_integer() {
+    let tokens: Vec<Token> = vec![
+        Token::new_string(TokenType::Print, "print"),
+        Token::new_string(TokenType::IntegerValue(23), "23"),
+        Token::new_string(TokenType::StatementEnd, ";"),
+    ];
+
+    let mut iter = tokens.into_iter();
+    let mut ast_parser = AstParser::new(&mut iter);
+    let ast = ast_parser.build_ast();
+    assert_eq!(ast,
+        Ok(Ast::Statements(
+            vec![Statement::Print(Expression::ScalarExpression(Scalar::Int(23)))]
+        )));
+
+}
+
 
 #[test]
 fn for_loop_assert_test() {
@@ -542,7 +562,7 @@ fn for_loop_assert_test() {
     //for x in 0..nTimes-1 do
     //  print x;
     //end for;
-    //assert (x = nTimes);
+    //assert (x = (nTimes - 1));
 
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::VarKeyword, "var"),
@@ -581,20 +601,36 @@ fn for_loop_assert_test() {
     ];
 
     let mut iter = tokens.into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
-    let foo: Result<(), String> = int.interpret();
-    println!("{:?}", int.interpreter_state.variables);
-    assert_eq!(Ok(()), foo);
-    assert_eq!(
-        int.interpreter_state.variables.get("x"),
-        Some(&Token {
-            token_type: TokenType::IntegerValue(2),
-            lexeme: Some(Lexeme::default())
-        })
-    );
-}
 
+    let mut ast_parser = AstParser::new(&mut iter);
+    let result = ast_parser.build_ast();
+
+    let loop_ast = Box::new(Ast::Statements(vec![Statement::Print(Expression::ScalarExpression(Scalar::Var(Id("x".to_owned()))))]));
+
+    assert_eq!(result, Ok(
+        Ast::Statements(vec![
+            Statement::VarDefn(Id("nTimes".to_owned()), Type::Int, Expression::ScalarExpression(Scalar::Int(3))),
+            Statement::ForLoop(Id("x".to_owned()),
+                               Expression::ScalarExpression(Scalar::Int(0)),
+                               Expression::Binary(
+                                   Box::new(Expression::ScalarExpression(Scalar::Var(Id("nTimes".to_owned())))),
+                                   Operator::Sub, Box::new(Expression::ScalarExpression(Scalar::Int(1)))),
+                               loop_ast),
+            Statement::Assert(
+                Expression::Binary(
+                    Box::new(Expression::ScalarExpression(Scalar::Var(Id("x".to_owned())))),
+                    Operator::Eq,
+                    Box::new(Expression::Binary(
+                        Box::new(Expression::ScalarExpression(Scalar::Var(Id("nTimes".to_owned())))),
+                        Operator::Sub,
+                        Box::new(Expression::ScalarExpression(Scalar::Int(1))),
+                    ))
+                )
+            )
+        ])
+    ))
+}
+/*
 #[test]
 fn evaluate_postfix_complex() {
     //5 1 2 + 4 * + 3 −
@@ -614,66 +650,6 @@ fn evaluate_postfix_complex() {
     let mut int = Interpreter::new(&mut iter, &mut state);
     let res = int.evaluate_postfix(&mut tokens);
     assert_eq!(res.unwrap().token_type, TokenType::IntegerValue(14));
-}
-
-#[test]
-fn parse_var_definition() {
-    let val = Token::new_string(TokenType::IntegerValue(1), "1");
-    let tokens: Vec<Token> = vec![
-        Token::new_string(TokenType::VarKeyword, "var"),
-        Token::new_string(TokenType::Identifier, "x"),
-        Token::new_string(TokenType::TypeDeclaration, ":"),
-        Token::new_string(TokenType::IntegerType, "int"),
-        Token::new_string(TokenType::ValueDefinition, ":="),
-        val.clone(),
-        Token::new_string(TokenType::StatementEnd, ";"),
-    ];
-
-    let mut iter = tokens.into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
-    int.interpret();
-    assert!(int.interpreter_state.variables.contains_key("x"));
-    assert_eq!(int.interpreter_state.variables.get("x"), Some(&val));
-}
-
-#[test]
-fn parse_var_definition_2() {
-    let tokens: Vec<Token> = vec![
-        Token::new_string(TokenType::VarKeyword, "var"),
-        Token::new_string(TokenType::Identifier, "x"),
-        Token::new_string(TokenType::TypeDeclaration, ":"),
-        Token::new_string(TokenType::IntegerType, "string"),
-        Token::new_string(TokenType::ValueDefinition, ":="),
-        Token::new_string(TokenType::StringLiteral(0), "\"foobar\""),
-        Token::new_string(TokenType::StatementEnd, ";"),
-    ];
-
-    let mut iter = tokens.into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
-    int.interpret();
-}
-
-#[test]
-fn parse_var_declaration() {
-    let _xtoken = Token::new_string(TokenType::Identifier, "x");
-    let tokentype = Token::new_string(TokenType::IntegerType, "int");
-    let _lexeme = Lexeme::default();
-    let tokens: Vec<Token> = vec![
-        Token::new_string(TokenType::VarKeyword, "var"),
-        Token::new_string(TokenType::Identifier, "x"),
-        Token::new_string(TokenType::TypeDeclaration, ":"),
-        tokentype.clone(),
-        Token::new_string(TokenType::StatementEnd, ";"),
-    ];
-
-    let mut iter = tokens.into_iter();
-    let mut state = InterpreterState::new();
-    let mut int = Interpreter::new(&mut iter, &mut state);
-    int.interpret();
-    assert!(int.interpreter_state.variables.contains_key("x"));
-    assert_eq!(int.interpreter_state.variables.get("x"), Some(&tokentype));
 }
 
 #[test]
@@ -1039,3 +1015,4 @@ fn stateful_var_definition() {
     assert!(state.variables.contains_key("x"));
     assert_eq!(state.variables.get("x"), Some(&Token::new_string(TokenType::IntegerValue(1), "1")));
 }
+*/

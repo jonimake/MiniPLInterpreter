@@ -1,14 +1,14 @@
-use std::collections::hash_map::DefaultHasher;
-use std::fmt;
-use std::hash::Hash;
-use std::hash::Hasher;
+use ::std::collections::hash_map::DefaultHasher;
+use ::std::fmt;
+use ::std::hash::Hash;
+use ::std::hash::Hasher;
 
 use crate::lexer;
 use crate::lexer::lexeme::Lexeme;
 use crate::lexer::lexeme::LexemeType;
 use crate::parser::token_type::TokenType;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: Option<Lexeme>,
@@ -40,7 +40,7 @@ impl Default for Token {
         }
     }
 }
-
+/*
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(t) = self.lexeme.clone() {
@@ -50,7 +50,7 @@ impl fmt::Debug for Token {
         }
     }
 }
-
+*/
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.token_type)

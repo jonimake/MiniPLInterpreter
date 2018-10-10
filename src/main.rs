@@ -1,4 +1,7 @@
 #![feature(uniform_paths, tool_lints)]
+#![feature(try_from)]
+#![feature(nll)]
+#![feature(str_escape)]
 
 #![allow(unknown_lints)]
 #![warn(clippy::all)]
@@ -8,6 +11,8 @@ use minipli::parser::interpreter::InterpreterState;
 
 pub mod lexer;
 pub mod parser;
+pub mod ast;
+pub mod visualizer;
 
 #[macro_use]
 extern crate log;
@@ -15,6 +20,9 @@ use simplelog;
 use structopt;
 #[macro_use]
 extern crate structopt_derive;
+extern crate core;
+extern crate rustc_serialize;
+extern crate term_painter;
 
 use simplelog::Config;
 use simplelog::LogLevelFilter;
@@ -27,12 +35,12 @@ use structopt::StructOpt;
 //use crate::parser::token::Token;
 //use crate::parser::token_iterator::TokenIterator;
 
-use std::env;
-use std::fs::File;
-use std::io;
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::Path;
+use ::std::env;
+use ::std::fs::File;
+use ::std::io;
+use ::std::io::prelude::*;
+use ::std::io::BufReader;
+use ::std::path::Path;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "MiniPLInterpreter")]
@@ -63,10 +71,10 @@ enum LogLevel {
     Trace,
 }
 
-impl std::str::FromStr for LogLevel {
-    type Err = std::string::ParseError;
+impl ::std::str::FromStr for LogLevel {
+    type Err = ::std::string::ParseError;
 
-    fn from_str(text: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(text: &str) -> ::std::result::Result<Self, Self::Err> {
         match text {
             "info" => Result::Ok(LogLevel::Info),
             "warning" => Result::Ok(LogLevel::Warning),

@@ -1,7 +1,7 @@
-use std::i32;
-use std::iter::Enumerate;
-use std::str::Lines;
-use std::usize;
+use ::std::i32;
+use ::std::iter::Enumerate;
+use ::std::str::Lines;
+use ::std::usize;
 
 use super::lexeme::Lexeme;
 use super::lexeme::LexemeType;
