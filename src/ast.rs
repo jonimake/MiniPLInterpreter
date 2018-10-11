@@ -7,15 +7,12 @@ stmt    -> print expr                           {print}
 stmt    -> assert ( expr )                      {assert}
 */
 
-use crate::visualizer::Tree;
-use crate::visualizer::Node;
-use crate::visualizer::NodePtr;
 use crate::parser::token::Token;
 use crate::parser::token_type::TokenType;
-use ::std::collections::hash_map::DefaultHasher;
-use ::std::hash::Hash;
-use ::std::hash::Hasher;
-use ::std::convert::TryFrom;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::convert::TryFrom;
 
 #[derive(PartialEq, Debug, Clone, Hash)]
 pub enum Ast {

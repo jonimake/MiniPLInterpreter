@@ -1,11 +1,11 @@
 #[allow(unused)]
 
-use ::std::collections::HashMap;
-use ::std::iter::Peekable;
-use ::std::vec::Vec;
-use ::std::collections::hash_map::DefaultHasher;
-use ::std::hash::{Hash, Hasher};
-use ::std::convert::TryFrom;
+use std::collections::HashMap;
+use std::iter::Peekable;
+use std::vec::Vec;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::convert::TryFrom;
 
 use crate::lexer::lexeme::Lexeme;
 use crate::parser::token::Token;
@@ -67,64 +67,10 @@ impl<'a> AstParser<'a> {
     }
 
     fn read(&mut self) -> Result<Statement, String> {
-        let tokens: (Token, Token) = {
-            let _ = self.expect_next(TokenType::Read)?;
-            let id = self.expect_next(TokenType::Identifier)?;
-            let maybetoken = self.get_variable_value(&id);
-            let variable = match maybetoken {
-                Some(t) => t,
-                None => return Err("Can't read variable with an invalid variable ID".to_string()),
-            };
 
-            use ::std::io;
-
-            let mut input_text = String::new();
-            io::stdin().read_line(&mut input_text).expect("failed to read from stdin");
-
-            let trimmed = input_text.trim();
-
-            let t: Token = match variable {
-                Token {
-                    token_type: TokenType::IntegerValue(_),
-                    ..
-                }
-                | Token {
-                    token_type: TokenType::IntegerType,
-                    ..
-                } => {
-                    let parsed_value = trimmed.parse::<i32>().unwrap_or(0);
-                    let tt = TokenType::IntegerValue(parsed_value);
-                    Token::new_string(tt, trimmed)
-                }
-                Token {
-                    token_type: TokenType::BooleanType,
-                    ..
-                }
-                | Token {
-                    token_type: TokenType::BooleanValue(_),
-                    ..
-                } => {
-                    let parsed_value = trimmed.parse::<bool>().unwrap_or(false);
-                    let tt = TokenType::BooleanValue(parsed_value);
-                    Token::new_string(tt, trimmed)
-                }
-                Token {
-                    token_type: TokenType::StringType,
-                    ..
-                }
-                | Token {
-                    token_type: TokenType::StringLiteral(_),
-                    ..
-                } => {
-                    let tt = TokenType::StringLiteral(0);
-                    Token::new_string(tt, trimmed)
-                }
-                _ => return Err("Variable not defined for read".to_string()),
-            };
-            (id, t)
-        };
-        self.set_variable_value(tokens.0, tokens.1);
-        Ok(Statement::Read(Id("todo".to_owned())))
+        let _ = self.expect_next(TokenType::Read)?;
+        let id = self.expect_next(TokenType::Identifier)?;
+        Ok(Statement::Read(Id(id.lexeme.unwrap().lexeme)))
     }
 
     fn assert(&mut self) -> Result<Statement, String> {

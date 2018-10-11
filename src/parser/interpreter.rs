@@ -1,6 +1,6 @@
-use ::std::collections::HashMap;
-use ::std::iter::Peekable;
-use ::std::vec::Vec;
+use std::collections::HashMap;
+use std::iter::Peekable;
+use std::vec::Vec;
 
 use crate::lexer::lexeme::Lexeme;
 use crate::parser::token::Token;
@@ -95,7 +95,7 @@ impl<'a, 'b: 'a> Interpreter<'a, 'b> {
                 None => return Err("Can't read variable with an invalid variable ID".to_string()),
             };
 
-            use ::std::io;
+            use std::io;
 
             let mut input_text = String::new();
             io::stdin().read_line(&mut input_text).expect("failed to read from stdin");

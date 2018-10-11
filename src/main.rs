@@ -5,6 +5,7 @@
 
 #![allow(unknown_lints)]
 #![warn(clippy::all)]
+#![allow(dead_code)]
 
 extern crate minipliinterpreter as minipli;
 use minipli::parser::interpreter::InterpreterState;
@@ -12,7 +13,6 @@ use minipli::parser::interpreter::InterpreterState;
 pub mod lexer;
 pub mod parser;
 pub mod ast;
-pub mod visualizer;
 
 #[macro_use]
 extern crate log;
@@ -21,13 +21,11 @@ use structopt;
 #[macro_use]
 extern crate structopt_derive;
 extern crate core;
-extern crate rustc_serialize;
-extern crate term_painter;
 
-use simplelog::Config;
-use simplelog::LogLevelFilter;
-use simplelog::TermLogger;
-use structopt::StructOpt;
+use ::simplelog::Config;
+use ::simplelog::LogLevelFilter;
+use ::simplelog::TermLogger;
+use ::structopt::StructOpt;
 
 //use crate::lexer::lexeme_iterator::LexemeIterator;
 //use crate::parser::interpreter::Interpreter;
@@ -35,12 +33,12 @@ use structopt::StructOpt;
 //use crate::parser::token::Token;
 //use crate::parser::token_iterator::TokenIterator;
 
-use ::std::env;
-use ::std::fs::File;
-use ::std::io;
-use ::std::io::prelude::*;
-use ::std::io::BufReader;
-use ::std::path::Path;
+use std::env;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::Path;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "MiniPLInterpreter")]
@@ -71,10 +69,10 @@ enum LogLevel {
     Trace,
 }
 
-impl ::std::str::FromStr for LogLevel {
-    type Err = ::std::string::ParseError;
+impl std::str::FromStr for LogLevel {
+    type Err = std::string::ParseError;
 
-    fn from_str(text: &str) -> ::std::result::Result<Self, Self::Err> {
+    fn from_str(text: &str) -> std::result::Result<Self, Self::Err> {
         match text {
             "info" => Result::Ok(LogLevel::Info),
             "warning" => Result::Ok(LogLevel::Warning),
@@ -129,7 +127,7 @@ fn main() {
         info!("File read");
         buffer.trim_left_matches("\u{feff}");
 
-        let _ = minipli::eval_file(&buffer);
+        let _ = minipli::parse_string(&buffer);
     } else {
         println!("Type commands");
         println!("Type {:?} to exit", exit_keyword);
@@ -144,7 +142,7 @@ fn main() {
             if input_text.to_string().trim() == exit_keyword {
                 break;
             }
-            minipli::eval_line(&input_text.to_string().trim(), &mut state);
+            minipli::parse_string(&input_text.to_string().trim());
         }
     };
 }

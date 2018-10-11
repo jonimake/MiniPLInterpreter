@@ -1,11 +1,10 @@
 use crate::ast::{Ast, Statement, Expression, Operator, Id, Scalar, Type};
-use crate::visualizer::Node;
 
-use ::std::hash::Hash;
-use ::std::hash::Hasher;
-use ::std::collections::hash_map::DefaultHasher;
-use ::std::cmp::Ordering;
-use ::std::borrow::Cow;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::collections::hash_map::DefaultHasher;
+use std::cmp::Ordering;
+use std::borrow::Cow;
 
 static mut INDEX: usize = 0;
 
@@ -52,13 +51,13 @@ impl PartialOrd for GraphNode {
     }
 }
 
-pub trait AstVisitor<T> {
-    fn visit(&self) -> T;
+pub trait DotGraphNode<T> {
+    fn convert(&self) -> T;
 }
 
 
-impl AstVisitor<GraphNode> for Operator {
-    fn visit(&self) -> GraphNode {
+impl DotGraphNode<GraphNode> for Operator {
+    fn convert(&self) -> GraphNode {
         GraphNode {
             id: get_tree_ptr(),
             label: format!("{:?}", self),
@@ -68,12 +67,12 @@ impl AstVisitor<GraphNode> for Operator {
 }
 
 
-impl AstVisitor<Vec<GraphNode>> for Scalar {
-    fn visit(&self) -> Vec<GraphNode> {
+impl DotGraphNode<Vec<GraphNode>> for Scalar {
+    fn convert(&self) -> Vec<GraphNode> {
         let id = get_tree_ptr();
         let (label, mut children) = match self {
             Scalar::Var(id) => {
-                let child = id.visit();
+                let child = id.convert();
                 ("Var".to_owned(), vec![child])
             },
             Scalar::Str(s) => (s.to_owned().replace("\"", "\\\""), Vec::default()),
@@ -93,22 +92,22 @@ impl AstVisitor<Vec<GraphNode>> for Scalar {
     }
 }
 
-impl AstVisitor<Vec<GraphNode>> for Expression {
-    fn visit(&self) -> Vec<GraphNode> {
+impl DotGraphNode<Vec<GraphNode>> for Expression {
+    fn convert(&self) -> Vec<GraphNode> {
         let id = get_tree_ptr();
         let mut immediate_children: Vec<GraphNode> = Vec::default();
-        let mut label = "";
+        let label;
         let mut child_nodes = match self {
             Expression::ScalarExpression(scalar) => {
-                let graphnodes = scalar.visit();
+                let graphnodes = scalar.convert();
                 label = "Scalar expression";
                 immediate_children.push(graphnodes.first().unwrap().clone());
                 graphnodes
             },
             Expression::Unary(left, right) => {
-                let mut left_node = vec![left.visit()];
+                let mut left_node = vec![left.convert()];
                 label = "Unary expression";
-                let mut right_nodes = right.visit();
+                let mut right_nodes = right.convert();
 
                 immediate_children.push(left_node.first().unwrap().clone());
                 immediate_children.push(right_nodes.first().unwrap().clone());
@@ -118,9 +117,9 @@ impl AstVisitor<Vec<GraphNode>> for Expression {
             },
             Expression::Binary(left, op, right) => {
                 label = "Binary expression";
-                let center_node = op.visit();
-                let mut left_nodes = left.visit();
-                let mut right_nodes = right.visit();
+                let center_node = op.convert();
+                let mut left_nodes = left.convert();
+                let mut right_nodes = right.convert();
 
                 immediate_children.push(center_node.clone());
                 immediate_children.push(left_nodes.first().unwrap().clone());
@@ -146,8 +145,8 @@ impl AstVisitor<Vec<GraphNode>> for Expression {
 }
 
 
-impl AstVisitor<Vec<GraphNode>> for Ast {
-    fn visit(&self) -> Vec<GraphNode> {
+impl DotGraphNode<Vec<GraphNode>> for Ast {
+    fn convert(&self) -> Vec<GraphNode> {
         let id = get_tree_ptr();
         let mut children: Vec<NodeId> = Vec::new();
         let mut all_nodes: Vec<GraphNode> = Vec::new();
@@ -155,7 +154,7 @@ impl AstVisitor<Vec<GraphNode>> for Ast {
         match self {
             Ast::Statements(statements) => {
                 for statement in statements {
-                    let mut statement_nodes = statement.visit();
+                    let mut statement_nodes = statement.convert();
                     if let Some(first) = statement_nodes.first() {
                         children.push(first.id);
                     }
@@ -177,25 +176,25 @@ impl AstVisitor<Vec<GraphNode>> for Ast {
     }
 }
 
-impl AstVisitor<Vec<GraphNode>> for Statement {
-    fn visit(&self) -> Vec<GraphNode> {
+impl DotGraphNode<Vec<GraphNode>> for Statement {
+    fn convert(&self) -> Vec<GraphNode> {
         let id = get_tree_ptr();
-        let mut label = "";
+        let label;
         let mut immediate_children: Vec<GraphNode> = Vec::default();
         let mut all_nodes = match self {
             Statement::VarDecl(id, typ) => {
                 label = "Var declaration";
-                let id_node = id.visit();
-                let type_node = typ.visit();
+                let id_node = id.convert();
+                let type_node = typ.convert();
                 immediate_children.push(id_node.clone());
                 immediate_children.push(type_node.clone());
                 vec![id_node, type_node]
             },
             Statement::VarDefn(id, typ, expr) => {
                 label = "Var definition";
-                let id_node = id.visit();
-                let type_node = typ.visit();
-                let mut expr_nodes = expr.visit();
+                let id_node = id.convert();
+                let type_node = typ.convert();
+                let mut expr_nodes = expr.convert();
 
                 immediate_children.push(id_node.clone());
                 immediate_children.push(type_node.clone());
@@ -207,8 +206,8 @@ impl AstVisitor<Vec<GraphNode>> for Statement {
             },
             Statement::IdAssign(id, expr) => {
                 label = "Id assign";
-                let id_node = id.visit();
-                let mut expr_nodes = expr.visit();
+                let id_node = id.convert();
+                let mut expr_nodes = expr.convert();
                 immediate_children.push(id_node.clone());
                 immediate_children.push(expr_nodes.first().unwrap().clone());
 
@@ -218,10 +217,10 @@ impl AstVisitor<Vec<GraphNode>> for Statement {
             },
             Statement::ForLoop(id, start_expr, end_expr, ast) => {
                 label = "For loop";
-                let id_node = id.visit();
-                let mut start_expr_nodes = start_expr.visit();
-                let mut end_expr_nodes = end_expr.visit();
-                let mut ast_nodes = ast.visit();
+                let id_node = id.convert();
+                let mut start_expr_nodes = start_expr.convert();
+                let mut end_expr_nodes = end_expr.convert();
+                let mut ast_nodes = ast.convert();
 
                 immediate_children.push(id_node.clone());
                 immediate_children.push(start_expr_nodes.first().unwrap().clone());
@@ -236,19 +235,19 @@ impl AstVisitor<Vec<GraphNode>> for Statement {
             },
             Statement::Read(id) => {
                 label = "Read";
-                let id_node = id.visit();
+                let id_node = id.convert();
                 immediate_children.push(id_node.clone());
                 vec![id_node]
             },
             Statement::Print(expr) => {
                 label = "Print";
-                let expr_nodes = expr.visit();
+                let expr_nodes = expr.convert();
                 immediate_children.push(expr_nodes.first().unwrap().clone());
                 expr_nodes
             },
             Statement::Assert(expr) => {
                 label = "Assert";
-                let expr_nodes = expr.visit();
+                let expr_nodes = expr.convert();
                 immediate_children.push(expr_nodes.first().unwrap().clone());
                 expr_nodes
             },
@@ -267,8 +266,8 @@ impl AstVisitor<Vec<GraphNode>> for Statement {
     }
 }
 
-impl AstVisitor<GraphNode> for Id {
-    fn visit(&self) -> GraphNode {
+impl DotGraphNode<GraphNode> for Id {
+    fn convert(&self) -> GraphNode {
         let id = get_tree_ptr();
         GraphNode {
             id,
@@ -278,8 +277,8 @@ impl AstVisitor<GraphNode> for Id {
     }
 }
 
-impl AstVisitor<GraphNode> for Type {
-    fn visit(&self) -> GraphNode {
+impl DotGraphNode<GraphNode> for Type {
+    fn convert(&self) -> GraphNode {
         let id = get_tree_ptr();
         let label = format!("{:?}", self);
         GraphNode {
@@ -290,89 +289,14 @@ impl AstVisitor<GraphNode> for Type {
     }
 }
 
-
-/*
-impl AstVisitor<Vec<Node<usize, String>>> for Expression {
-    fn visit(&self, parent: usize) -> Vec<Node<usize, String>> {
-        let hash = get_tree_ptr();
-        let nodes = match self {
-            Expression::ScalarExpression(scalar) => {
-                scalar.visit(hash)
-            },
-            Expression::Unary(left, right) => {
-                let left_node = left.visit(hash);
-                let mut right_nodes = right.visit(hash);
-                right_nodes.push(left_node);
-                right_nodes
-            },
-            Expression::Binary(left, op, right) => {
-                let center_node = op.visit(hash);
-                let mut left_nodes = left.visit(center_node.key);
-                let mut right_nodes = right.visit(center_node.key);
-                left_nodes.push(center_node);
-                left_nodes.append(&mut right_nodes);
-                left_nodes
-            },
-        };
-        nodes
-    }
-}
-
-impl AstVisitor<Node<usize, String>> for Operator {
-    fn visit(&self, parent: usize) -> Node<usize, String> {
-        let txt = format!("{:?}", self);
-        let hash = get_tree_ptr();
-        Node {
-            key: hash,
-            value: txt,
-            left: None,
-            right: None,
-            up: Some(parent),
-        }
-    }
-}
-
-
-impl AstVisitor<Node<usize, String>> for Type {
-    fn visit(&self, parent: usize) -> Node<usize, String> {
-        let txt = match self {
-            Type::Str => {
-                "String type"
-            },
-            Type::Int => {
-                "Int type"
-            },
-            Type::Bool => {
-                "Bool type"
-            },
-        };
-        let id = get_tree_ptr();
-        Node {
-            key: id,
-            value: txt.to_owned(),
-            left: None,
-            right: None,
-            up: Some(parent),
-        }
-    }
-}
-
-
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    use ::std::collections::hash_map::DefaultHasher;
-    let mut s: DefaultHasher = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
-}
-*/
 #[test]
 fn visualize_var_definition() {
     use crate::parser::token::Token;
     use crate::parser::token_type::TokenType;
     use crate::parser::ast_parser::AstParser;
     use crate::ast::Ast;
-    use crate::ast_visitor::AstVisitor;
-    use crate::visualizer;
+    use crate::ast_visualizer::DotGraphNode;
+
 
     let tokens: Vec<Token> = vec![
         Token::new_string(TokenType::VarKeyword, "var"),
@@ -388,7 +312,7 @@ fn visualize_var_definition() {
     let mut ast_parser = AstParser::new(&mut iter);
     let ast = ast_parser.build_ast().unwrap();
 
-    let nodes = ast.visit();
+    let nodes = ast.convert();
     let out = nodes.iter().flat_map(|e| e.get_dot_output()).collect::<Vec<String>>();
     for s in out {
         println!("{}", s);
